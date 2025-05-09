@@ -2,15 +2,13 @@
 import { useState } from 'react';
 import Header from "@/components/Header";
 import { StepIndicator } from "@/components/StepIndicator";
-import TaskDescription from "@/components/TaskDescription";
-import ClarificationDialog from "@/components/ClarificationDialog";
+import SpecificationBuilder from "@/components/SpecificationBuilder";
 import ControllerSetup from "@/components/ControllerSetup";
 import ExperimentDashboard from "@/components/ExperimentDashboard";
 import FinalizeExport from "@/components/FinalizeExport";
 
 const steps = [
-  "Describe Task",
-  "Clarify & Confirm",
+  "Specification",
   "Controller Setup",
   "Experiment",
   "Finalize"
@@ -18,34 +16,27 @@ const steps = [
 
 const Index = () => {
   const [currentStep, setCurrentStep] = useState(1);
-  const [taskDescription, setTaskDescription] = useState('');
   const [specConfig, setSpecConfig] = useState<any>(null);
   const [controllerConfig, setControllerConfig] = useState<any>(null);
   const [selectedController, setSelectedController] = useState<any>(null);
   
-  const handleTaskSubmit = (description: string) => {
-    setTaskDescription(description);
-    setCurrentStep(2);
-  };
-  
   const handleSpecConfirm = (spec: any) => {
     setSpecConfig(spec);
-    setCurrentStep(3);
+    setCurrentStep(2);
   };
   
   const handleLaunchExperiment = (config: any) => {
     setControllerConfig(config);
-    setCurrentStep(4);
+    setCurrentStep(3);
   };
   
   const handleSelectBest = (controller: any) => {
     setSelectedController(controller);
-    setCurrentStep(5);
+    setCurrentStep(4);
   };
   
   const handleNewExperiment = () => {
     // Reset state and go to first step
-    setTaskDescription('');
     setSpecConfig(null);
     setControllerConfig(null);
     setSelectedController(null);
@@ -61,31 +52,26 @@ const Index = () => {
         
         <div className="mt-8">
           {currentStep === 1 && (
-            <TaskDescription onSubmit={handleTaskSubmit} />
-          )}
-          
-          {currentStep === 2 && taskDescription && (
-            <ClarificationDialog 
-              initialPrompt={taskDescription}
+            <SpecificationBuilder 
               onConfirm={handleSpecConfirm}
             />
           )}
           
-          {currentStep === 3 && specConfig && (
+          {currentStep === 2 && specConfig && (
             <ControllerSetup 
               spec={specConfig}
               onLaunch={handleLaunchExperiment}
             />
           )}
           
-          {currentStep === 4 && controllerConfig && (
+          {currentStep === 3 && controllerConfig && (
             <ExperimentDashboard 
               config={controllerConfig}
               onSelectBest={handleSelectBest}
             />
           )}
           
-          {currentStep === 5 && selectedController && (
+          {currentStep === 4 && selectedController && (
             <FinalizeExport 
               controller={selectedController}
               onNewExperiment={handleNewExperiment}

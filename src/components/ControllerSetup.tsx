@@ -14,10 +14,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
+import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 
 interface ControllerSetupProps {
   spec: any;
   onLaunch: (config: any) => void;
+}
+
+interface ControllerType {
+  id: string;
+  name: string;
+  description: string;
+  successProbability: number;
+  timeEstimate: string;
+  requiresGPU: boolean;
 }
 
 const ControllerSetup = ({ spec, onLaunch }: ControllerSetupProps) => {
@@ -25,13 +36,56 @@ const ControllerSetup = ({ spec, onLaunch }: ControllerSetupProps) => {
     pid: true,
     lqr: true,
     mpc: false,
-    rl: false
+    rl: false,
+    custom: false
   });
   
   const [tuningStrategy, setTuningStrategy] = useState('llm');
   const [iterations, setIterations] = useState(5);
   const [trials, setTrials] = useState(8);
   const [workers, setWorkers] = useState(4);
+  const [customControllerDesc, setCustomControllerDesc] = useState('');
+  
+  // Simulated controller types with probabilities and estimates
+  const controllerTypes: ControllerType[] = [
+    {
+      id: 'pid',
+      name: 'PID Controller',
+      description: 'Classic feedback control with proportional, integral, and derivative terms. Simple to implement with good performance for many systems.',
+      successProbability: 0.87,
+      timeEstimate: '5-10 minutes',
+      requiresGPU: false
+    },
+    {
+      id: 'lqr',
+      name: 'LQR Controller',
+      description: 'Linear Quadratic Regulator optimizes a cost function balancing performance and control effort.',
+      successProbability: 0.78,
+      timeEstimate: '8-12 minutes',
+      requiresGPU: false
+    },
+    {
+      id: 'mpc',
+      name: 'MPC Controller',
+      description: 'Model Predictive Control uses a model to predict future states and optimize control actions over a finite horizon.',
+      successProbability: 0.65,
+      timeEstimate: '15-20 minutes',
+      requiresGPU: true
+    },
+    {
+      id: 'rl',
+      name: 'RL Controller',
+      description: 'Reinforcement Learning controller learns optimal policy through interaction with the environment. Requires more compute time.',
+      successProbability: 0.52,
+      timeEstimate: '30-45 minutes',
+      requiresGPU: true
+    }
+  ];
+  
+  // Sort controllers by success probability
+  const rankedControllers = [...controllerTypes].sort((a, b) => 
+    b.successProbability - a.successProbability
+  );
   
   const handleControllerChange = (name: keyof typeof selectedControllers) => {
     setSelectedControllers(prev => ({
@@ -46,7 +100,8 @@ const ControllerSetup = ({ spec, onLaunch }: ControllerSetupProps) => {
       tuningStrategy,
       iterations,
       trials,
-      workers
+      workers,
+      customControllerDescription: customControllerDesc
     };
     
     onLaunch(config);
@@ -82,75 +137,102 @@ const ControllerSetup = ({ spec, onLaunch }: ControllerSetupProps) => {
                   
                   <div className="font-medium">Wind Gust:</div>
                   <div>{spec.constraints.wind_gust}</div>
+                  
+                  {spec.dataSource && (
+                    <>
+                      <div className="font-medium">Data Source:</div>
+                      <div className="truncate">{spec.dataSource}</div>
+                    </>
+                  )}
+                  
+                  <div className="font-medium">Visualization:</div>
+                  <div>{spec.simulation}</div>
                 </div>
               </div>
             </div>
             
             <div className="space-y-3">
-              <h3 className="font-medium">Controller Types</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* PID Controller */}
-                <div className="border border-border rounded-lg p-4 relative">
-                  <div className="absolute right-4 top-4">
-                    <Checkbox 
-                      id="pid" 
-                      checked={selectedControllers.pid}
-                      onCheckedChange={() => handleControllerChange('pid')}
-                    />
+              <h3 className="font-medium">Recommended Controllers</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Select the controllers you want to evaluate. Controllers are ranked by likelihood of success for your specific use case.
+              </p>
+              
+              <div className="space-y-4">
+                {rankedControllers.map((controller) => (
+                  <div key={controller.id} className="border border-border rounded-lg p-4 relative">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <h4 className="font-medium">{controller.name}</h4>
+                          <div className="text-xs px-2 py-1 rounded-full bg-secondary">
+                            {Math.round(controller.successProbability * 100)}% match
+                          </div>
+                          {controller.requiresGPU && (
+                            <div className="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-600">
+                              Requires GPU
+                            </div>
+                          )}
+                        </div>
+                        <Progress 
+                          value={controller.successProbability * 100} 
+                          className="h-1.5 mt-2 mb-3" 
+                        />
+                        <p className="text-sm text-muted-foreground mb-2">
+                          {controller.description}
+                        </p>
+                        <div className="text-xs text-muted-foreground">
+                          <span className="inline-block mr-4">⏱️ Est. time: {controller.timeEstimate}</span>
+                        </div>
+                      </div>
+                      
+                      <Checkbox 
+                        id={controller.id} 
+                        checked={selectedControllers[controller.id as keyof typeof selectedControllers]}
+                        onCheckedChange={() => handleControllerChange(controller.id as keyof typeof selectedControllers)}
+                        className="mt-1"
+                      />
+                    </div>
                   </div>
-                  <h4 className="font-medium mb-2">PID Controller</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Classic feedback control with proportional, integral, and derivative terms.
-                    Simple to implement with good performance for many systems.
-                  </p>
-                </div>
+                ))}
                 
-                {/* LQR Controller */}
+                {/* Custom Controller Option */}
                 <div className="border border-border rounded-lg p-4 relative">
-                  <div className="absolute right-4 top-4">
+                  <div className="flex justify-between items-start">
+                    <div className="w-full pr-8">
+                      <div className="flex items-center gap-3">
+                        <h4 className="font-medium">Custom Controller</h4>
+                      </div>
+                      
+                      <div className="mt-2">
+                        {selectedControllers.custom ? (
+                          <div className="space-y-2 w-full">
+                            <Label htmlFor="custom-controller">Describe your controller in natural language</Label>
+                            <Textarea
+                              id="custom-controller"
+                              placeholder="E.g., A nonlinear controller that uses gain scheduling based on altitude..."
+                              value={customControllerDesc}
+                              onChange={(e) => setCustomControllerDesc(e.target.value)}
+                              className="w-full"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              ⏱️ Est. time: Varies based on complexity
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            Define your own custom controller using natural language
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    
                     <Checkbox 
-                      id="lqr" 
-                      checked={selectedControllers.lqr}
-                      onCheckedChange={() => handleControllerChange('lqr')}
+                      id="custom" 
+                      checked={selectedControllers.custom}
+                      onCheckedChange={() => handleControllerChange('custom')}
+                      className="mt-1"
                     />
                   </div>
-                  <h4 className="font-medium mb-2">LQR Controller</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Linear Quadratic Regulator optimizes a cost function balancing 
-                    performance and control effort.
-                  </p>
-                </div>
-                
-                {/* MPC Controller */}
-                <div className="border border-border rounded-lg p-4 relative">
-                  <div className="absolute right-4 top-4">
-                    <Checkbox 
-                      id="mpc" 
-                      checked={selectedControllers.mpc}
-                      onCheckedChange={() => handleControllerChange('mpc')}
-                    />
-                  </div>
-                  <h4 className="font-medium mb-2">MPC Controller</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Model Predictive Control uses a model to predict future states and
-                    optimize control actions over a finite horizon.
-                  </p>
-                </div>
-                
-                {/* RL Controller */}
-                <div className="border border-border rounded-lg p-4 relative">
-                  <div className="absolute right-4 top-4">
-                    <Checkbox 
-                      id="rl" 
-                      checked={selectedControllers.rl}
-                      onCheckedChange={() => handleControllerChange('rl')}
-                    />
-                  </div>
-                  <h4 className="font-medium mb-2">RL Controller</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Reinforcement Learning controller learns optimal policy through
-                    interaction with the environment. Requires more compute time.
-                  </p>
                 </div>
               </div>
             </div>
@@ -259,7 +341,8 @@ const ControllerSetup = ({ spec, onLaunch }: ControllerSetupProps) => {
       <CardFooter className="flex justify-end border-t border-border pt-4">
         <Button
           onClick={handleLaunch}
-          disabled={!Object.values(selectedControllers).some(Boolean)}
+          disabled={!Object.values(selectedControllers).some(Boolean) || 
+                   (selectedControllers.custom && !customControllerDesc.trim())}
           className="bg-primary hover:bg-primary/90"
         >
           Start Experiments
