@@ -16,6 +16,14 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface ControllerSetupProps {
   spec: any;
@@ -157,82 +165,94 @@ const ControllerSetup = ({ spec, onLaunch }: ControllerSetupProps) => {
                 Select the controllers you want to evaluate. Controllers are ranked by likelihood of success for your specific use case.
               </p>
               
-              <div className="space-y-4">
-                {rankedControllers.map((controller) => (
-                  <div key={controller.id} className="border border-border rounded-lg p-4 relative">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="flex items-center gap-3">
-                          <h4 className="font-medium">{controller.name}</h4>
-                          <div className="text-xs px-2 py-1 rounded-full bg-secondary">
-                            {Math.round(controller.successProbability * 100)}% match
-                          </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[180px]">Controller</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="w-[100px] text-center">Match</TableHead>
+                    <TableHead className="w-[120px]">Est. Time</TableHead>
+                    <TableHead className="w-[50px]">Select</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rankedControllers.map((controller) => (
+                    <TableRow key={controller.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {controller.name}
                           {controller.requiresGPU && (
-                            <div className="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-600">
-                              Requires GPU
+                            <div className="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-600 whitespace-nowrap">
+                              GPU
                             </div>
                           )}
                         </div>
-                        <Progress 
-                          value={controller.successProbability * 100} 
-                          className="h-1.5 mt-2 mb-3" 
-                        />
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {controller.description}
-                        </p>
-                        <div className="text-xs text-muted-foreground">
-                          <span className="inline-block mr-4">⏱️ Est. time: {controller.timeEstimate}</span>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {controller.description}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex flex-col items-center">
+                          <span className="text-sm font-medium">{Math.round(controller.successProbability * 100)}%</span>
+                          <Progress 
+                            value={controller.successProbability * 100} 
+                            className="h-1.5 w-16 mt-1" 
+                          />
                         </div>
-                      </div>
-                      
-                      <Checkbox 
-                        id={controller.id} 
-                        checked={selectedControllers[controller.id as keyof typeof selectedControllers]}
-                        onCheckedChange={() => handleControllerChange(controller.id as keyof typeof selectedControllers)}
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-                ))}
-                
-                {/* Custom Controller Option */}
-                <div className="border border-border rounded-lg p-4 relative">
-                  <div className="flex justify-between items-start">
-                    <div className="w-full pr-8">
-                      <div className="flex items-center gap-3">
-                        <h4 className="font-medium">Custom Controller</h4>
-                      </div>
-                      
-                      <div className="mt-2">
-                        {selectedControllers.custom ? (
-                          <div className="space-y-2 w-full">
-                            <Label htmlFor="custom-controller">Describe your controller in natural language</Label>
-                            <Textarea
-                              id="custom-controller"
-                              placeholder="E.g., A nonlinear controller that uses gain scheduling based on altitude..."
-                              value={customControllerDesc}
-                              onChange={(e) => setCustomControllerDesc(e.target.value)}
-                              className="w-full"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              ⏱️ Est. time: Varies based on complexity
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">
-                            Define your own custom controller using natural language
-                          </p>
-                        )}
-                      </div>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {controller.timeEstimate}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Checkbox 
+                          id={controller.id} 
+                          checked={selectedControllers[controller.id as keyof typeof selectedControllers]}
+                          onCheckedChange={() => handleControllerChange(controller.id as keyof typeof selectedControllers)}
+                          className="mx-auto"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {/* Custom Controller Option */}
+              <div className="border border-border rounded-lg p-4 relative mt-4">
+                <div className="flex justify-between items-start">
+                  <div className="w-full pr-8">
+                    <div className="flex items-center gap-3">
+                      <h4 className="font-medium">Custom Controller</h4>
                     </div>
                     
-                    <Checkbox 
-                      id="custom" 
-                      checked={selectedControllers.custom}
-                      onCheckedChange={() => handleControllerChange('custom')}
-                      className="mt-1"
-                    />
+                    <div className="mt-2">
+                      {selectedControllers.custom ? (
+                        <div className="space-y-2 w-full">
+                          <Label htmlFor="custom-controller">Describe your controller in natural language</Label>
+                          <Textarea
+                            id="custom-controller"
+                            placeholder="E.g., A nonlinear controller that uses gain scheduling based on altitude..."
+                            value={customControllerDesc}
+                            onChange={(e) => setCustomControllerDesc(e.target.value)}
+                            className="w-full"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            ⏱️ Est. time: Varies based on complexity
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Define your own custom controller using natural language
+                        </p>
+                      )}
+                    </div>
                   </div>
+                  
+                  <Checkbox 
+                    id="custom" 
+                    checked={selectedControllers.custom}
+                    onCheckedChange={() => handleControllerChange('custom')}
+                    className="mt-1"
+                  />
                 </div>
               </div>
             </div>
