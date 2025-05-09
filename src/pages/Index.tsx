@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import Header from "@/components/Header";
 import { StepIndicator } from "@/components/StepIndicator";
@@ -28,6 +27,8 @@ const Index = () => {
   const handleLaunchExperiment = (config: any) => {
     setControllerConfig(config);
     setCurrentStep(3);
+    // Send message to Electron
+    window.electronAPI.startExperiment(JSON.stringify(config));
   };
   
   const handleSelectBest = (controller: any) => {

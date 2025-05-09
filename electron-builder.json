@@ -1,0 +1,20 @@
+{
+  "appId": "com.drone-pilot-whisperer.app",
+  "productName": "Drone Pilot Whisperer",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "dist-electron/**/*"
+  ],
+  "mac": {
+    "category": "public.app-category.utilities"
+  },
+  "win": {
+    "target": "nsis"
+  },
+  "linux": {
+    "target": "AppImage"
+  }
+} 

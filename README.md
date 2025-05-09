@@ -1,8 +1,42 @@
-# Welcome to your Lovable project
+# Drone Pilot Whisperer
 
 ## Project info
 
 **URL**: https://lovable.dev/projects/d5a3db51-8717-4dfe-a27a-fd17524904f8
+
+## How to run the application
+
+### Prerequisites
+
+- Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+
+### Development Mode
+
+To run the application in development mode with hot-reload:
+
+```sh
+# Install dependencies
+npm install
+
+# Start the development server
+npm run electron:dev
+```
+
+This will start both the Vite development server and Electron app, allowing you to see your changes in real-time.
+
+### Building for Production
+
+To build the application for production:
+
+```sh
+# Build the application
+npm run electron:build
+```
+
+This will create platform-specific installers in the `release` directory:
+- macOS: `.dmg` file
+- Windows: `.exe` installer
+- Linux: `.AppImage` file
 
 ## How can I edit this code?
 
@@ -18,8 +52,6 @@ Changes made via Lovable will be committed automatically to this repo.
 
 If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
 Follow these steps:
 
 ```sh
@@ -33,7 +65,7 @@ cd <YOUR_PROJECT_NAME>
 npm i
 
 # Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+npm run electron:dev
 ```
 
 **Edit a file directly in GitHub**
@@ -59,6 +91,7 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+- Electron
 
 ## How can I deploy this project?
 
