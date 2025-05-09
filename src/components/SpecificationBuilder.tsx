@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { X } from "lucide-react";
 
 interface Message {
   role: 'user' | 'assistant';
@@ -23,8 +23,9 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [apiEndpoint, setApiEndpoint] = useState('');
+  const [dataSourceText, setDataSourceText] = useState('');
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [pastedImage, setPastedImage] = useState<string | null>(null);
   
   // Spec state
   const [spec, setSpec] = useState({
@@ -58,7 +59,7 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
     
     // Simulate typing delay
     setTimeout(() => {
-      setMessages(prev => [...prev, { role: 'assistant' as const, content }]);
+      setMessages(prev => [...prev, { role: 'assistant', content }]);
       setIsLoading(false);
     }, 1000);
   };
@@ -94,10 +95,10 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
         response = "Thanks for mentioning the API. Could you provide more details about the endpoint structure and what kind of data it returns?";
         
         // Update spec with the API endpoint if provided
-        if (apiEndpoint) {
+        if (dataSourceText) {
           setSpec(prev => ({
             ...prev,
-            dataSource: apiEndpoint
+            dataSource: dataSourceText
           }));
         }
       }
@@ -129,10 +130,42 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
     }
   };
   
-  const handleUpload = () => {
-    setIsUploading(true);
-    // Simulate upload delay
-    setTimeout(() => setIsUploading(false), 1500);
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const blob = items[i].getAsFile();
+        if (blob) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (event.target && typeof event.target.result === 'string') {
+              setPastedImage(event.target.result);
+            }
+          };
+          reader.readAsDataURL(blob);
+          break;
+        }
+      }
+    }
+  };
+  
+  const handleRemovePastedImage = () => {
+    setPastedImage(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Handle data file
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target && typeof event.target.result === 'string') {
+          setDataSourceText(event.target.result);
+        }
+      };
+      reader.readAsText(file);
+    }
   };
 
   return (
@@ -166,20 +199,6 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                   value={taskDescription}
                   onChange={(e) => setTaskDescription(e.target.value)}
                 />
-              </div>
-              
-              <div className="border border-dashed border-border rounded-md p-6 flex flex-col items-center justify-center">
-                <p className="text-sm text-muted-foreground mb-2">
-                  Optionally upload an image (block diagram or photo of your system)
-                </p>
-                <Button 
-                  variant="outline" 
-                  className="bg-secondary/50"
-                  onClick={handleUpload}
-                  disabled={isUploading}
-                >
-                  {isUploading ? 'Uploading...' : 'Upload Image'}
-                </Button>
               </div>
               
               <div className="pt-4 flex justify-end">
@@ -247,13 +266,31 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                   </div>
                   
                   <div className="border-t border-border pt-3">
+                    {pastedImage && (
+                      <div className="mb-2 relative inline-block">
+                        <img 
+                          src={pastedImage} 
+                          alt="Pasted content" 
+                          className="max-h-20 rounded-md border border-border" 
+                        />
+                        <Button 
+                          variant="destructive" 
+                          size="icon"
+                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                          onClick={handleRemovePastedImage}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                     <div className="flex items-center space-x-2">
                       <textarea
                         className="flex h-10 w-full rounded-md border-0 bg-secondary px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                        placeholder="Type your response..."
+                        placeholder="Type your response or paste an image..."
                         value={userInput}
                         onChange={(e) => setUserInput(e.target.value)}
                         onKeyDown={handleKeyPress}
+                        onPaste={handlePaste}
                         disabled={isLoading}
                         rows={1}
                       />
@@ -274,16 +311,23 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                   
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="api-endpoint">Data Source API Endpoint (Optional)</Label>
-                      <Input 
-                        id="api-endpoint" 
-                        placeholder="https://api.example.com/drone-data"
-                        value={apiEndpoint}
-                        onChange={(e) => setApiEndpoint(e.target.value)}
+                      <Label>Data Source</Label>
+                      <Textarea 
+                        placeholder="Paste documentation about your data source or API here..."
+                        value={dataSourceText}
+                        onChange={(e) => setDataSourceText(e.target.value)}
+                        className="min-h-24"
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Enter an API endpoint that provides telemetry or training data
-                      </p>
+                      <div className="flex items-center space-x-2 mt-2">
+                        <span className="text-xs text-muted-foreground">
+                          Or upload a data file:
+                        </span>
+                        <input 
+                          type="file" 
+                          onChange={handleFileChange} 
+                          className="text-xs text-muted-foreground"
+                        />
+                      </div>
                     </div>
                     
                     <div className="space-y-2">

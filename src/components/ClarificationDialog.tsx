@@ -52,7 +52,7 @@ const ClarificationDialog = ({ initialPrompt, onConfirm }: ClarificationDialogPr
     
     // Simulate typing delay
     setTimeout(() => {
-      setMessages(prev => [...prev, { role: 'assistant', content }]);
+      setMessages(prev => [...prev, { role: 'assistant' as const, content }]);
       setIsLoading(false);
     }, 1000);
   };
@@ -61,8 +61,8 @@ const ClarificationDialog = ({ initialPrompt, onConfirm }: ClarificationDialogPr
     if (!userInput.trim()) return;
     
     // Add user message
-    const newMessages = [...messages, { role: 'user', content: userInput }];
-    setMessages(newMessages);
+    const newMessage: Message = { role: 'user', content: userInput };
+    setMessages(prev => [...prev, newMessage]);
     setUserInput('');
     
     // Simulate assistant response based on user input
@@ -198,55 +198,54 @@ const ClarificationDialog = ({ initialPrompt, onConfirm }: ClarificationDialogPr
         </CardHeader>
         
         <CardContent className="flex-grow">
-          <Tabs defaultValue="yaml">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="yaml">YAML</TabsTrigger>
+          <Tabs defaultValue="details">
+            <TabsList className="grid w-full grid-cols-1">
               <TabsTrigger value="details">Details</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="yaml" className="mt-4">
-              <div className="code-block">
-                <pre>
-{`plant: ${spec.plant}
-controls: [${spec.controls.join(', ')}]
-objective:
-  hold_position: [${spec.objective.hold_position.join(', ')}m]
-  duration: ${spec.objective.duration}s
-constraints:
-  wind_gust: ${spec.constraints.wind_gust}
-  sample_time: ${spec.constraints.sample_time}s
-simulation: ${spec.simulation}`}
-                </pre>
-              </div>
-            </TabsContent>
-            
             <TabsContent value="details" className="space-y-4 mt-4">
-              <div>
-                <h3 className="font-medium text-sm text-muted-foreground mb-1">Plant Type</h3>
-                <p className="text-base">{spec.plant}</p>
-              </div>
-              
-              <div>
-                <h3 className="font-medium text-sm text-muted-foreground mb-1">Control Inputs</h3>
-                <div className="flex flex-wrap gap-2">
-                  {spec.controls.map(control => (
-                    <span key={control} className="px-2 py-1 bg-secondary rounded-md text-sm">
-                      {control}
-                    </span>
-                  ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Plant Type</h3>
+                    <p className="text-base">{spec.plant}</p>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Control Inputs</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {spec.controls.map(control => (
+                        <span key={control} className="px-2 py-1 bg-secondary rounded-md text-sm">
+                          {control}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Objective</h3>
+                    <p className="text-sm">Hold position at [{spec.objective.hold_position.join(', ')}m]</p>
+                    <p className="text-sm">Duration: {spec.objective.duration}s</p>
+                  </div>
+                  
+                  <div>
+                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Constraints</h3>
+                    <p className="text-sm">Wind gust: {spec.constraints.wind_gust}</p>
+                    <p className="text-sm">Sample time: {spec.constraints.sample_time}s</p>
+                  </div>
                 </div>
-              </div>
-              
-              <div>
-                <h3 className="font-medium text-sm text-muted-foreground mb-1">Objective</h3>
-                <p className="text-sm">Hold position at [{spec.objective.hold_position.join(', ')}m]</p>
-                <p className="text-sm">Duration: {spec.objective.duration}s</p>
-              </div>
-              
-              <div>
-                <h3 className="font-medium text-sm text-muted-foreground mb-1">Constraints</h3>
-                <p className="text-sm">Wind gust: {spec.constraints.wind_gust}</p>
-                <p className="text-sm">Sample time: {spec.constraints.sample_time}s</p>
+                
+                <div>
+                  <h3 className="font-medium text-sm text-muted-foreground mb-2">Visualization Preview</h3>
+                  <div className="aspect-video bg-secondary/20 rounded-lg border border-border flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="text-4xl mb-2">
+                        {spec.simulation === 'real-time 3D' ? '3D' : '2D'}
+                      </div>
+                      <p className="text-muted-foreground text-sm">{spec.simulation} visualization will be used</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </TabsContent>
           </Tabs>
