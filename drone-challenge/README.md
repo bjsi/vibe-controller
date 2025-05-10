@@ -9,4 +9,4 @@ Run with:
 
 ## Hints
 
-roll -45 to 45 throttle 0-100, battery simulation on the drone which impacts throttle, pitch is also -45 to 45 timesteps are every 100ms, probably need to send info constantly
+roll -45 to 45 throttle 0-100, battery simulation on the drone which impacts throttle, pitch is also -45 to 45 timesteps are every 100ms, probably need to send info constantly, wind simulation is randomly seeded each time

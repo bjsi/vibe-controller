@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { saveExperiment } from '../filesystem.js';
 
 const router = Router();
 
@@ -8,16 +9,23 @@ const startExperimentSchema = z.object({
   instructions: z.string()
 });
 
-router.post('/start_experiment', (req, res) => {
+router.post('/start_experiment', async (req, res) => {
   try {
     const { id, instructions } = startExperimentSchema.parse(req.body);
     
-    // TODO: Implement experiment logic here
+    const experimentData = {
+      id,
+      instructions,
+      status: 'started',
+      startTime: new Date().toISOString()
+    };
+    
+    await saveExperiment(id, experimentData);
     
     res.json({
       status: 'success',
       message: 'Experiment started',
-      data: { id, instructions }
+      data: experimentData
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
