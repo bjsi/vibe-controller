@@ -3,6 +3,7 @@ import cors from 'cors';
 import { config } from 'dotenv';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFoundHandler } from './middleware/notFoundHandler.js';
+import experimentRouter from './routes/experiment.js';
 
 // Load environment variables
 config();
@@ -18,6 +19,8 @@ app.use(express.json());
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+app.use('/api/experiment', experimentRouter);
 
 // Error handling
 app.use(notFoundHandler);
