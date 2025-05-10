@@ -197,7 +197,42 @@ class MyController:
 #     # print(f"MAIN: Simulation run completed for experiment \\${id}.")
 \`\`\``;
     
-    await startAgent({ id, instructions: enhancedInstructions, directory: experimentsDir });
+    // Add instructions for iterative testing and refinement
+    const iterativeTestingInstructions = `
+
+# --- Iterative Testing and Refinement Loop ---
+After your initial implementation of 'drone_controller_${id}.py':
+
+1.  **Propose Execution of Your Script**:
+    *   Use the 'run_terminal_cmd' tool to propose the command to execute your generated 'drone_controller_${id}.py' script.
+    *   Example proposed command: \`python experiments/${id}/drone_controller_${id}.py\`
+    *   The user will execute this command. Wait for the user to indicate the simulation run is complete.
+
+2.  **Propose Data Retrieval from the Simulation Host**:
+    *   Once the simulation run is finished, use the 'run_terminal_cmd' tool to propose a \`curl\` command to fetch the performance data stored by the host.
+    *   The API endpoint to get data is \`/get_test_data?id=${id}\`
+    *   Example proposed command (assuming API server is on localhost:3000): \`curl "http://localhost:3000/get_test_data?id=${id}" | cat\`
+    *   The result of this command (the JSON data) will be returned to you.
+
+3.  **Analyze Performance Data**:
+    *   Examine the JSON data returned from the \`curl\` command.
+    *   Compare this data against the experiment objectives (e.g., target altitude, stability, duration at target).
+    *   For example, if the objective is to hold position Z=100, and the data shows the drone averaged Z=80, this indicates a need for adjustment.
+
+4.  **Refine Your Controller**:
+    *   Based on your analysis, identify specific changes to make to 'drone_controller_${id}.py'.
+    *   This will typically involve adjusting values in the 'experiment_params' dictionary within the script (e.g., PID gains like 'throttle_kp', 'roll_ki', etc.).
+    *   You might also need to adjust the logic within your 'MyController.compute_control()' method if parameter tuning alone is insufficient.
+    *   Use the 'edit_file' tool to apply these precise changes to 'drone_controller_${id}.py'.
+
+5.  **Repeat**: 
+    *   After refining the script, you can repeat this loop starting from step 1 (proposing execution of the updated script) to observe the effect of your changes and further improve performance.
+    *   Inform the user that you are about to start a new iteration of testing.
+`;
+
+    const finalInstructions = enhancedInstructions + iterativeTestingInstructions;
+    
+    await startAgent({ id, instructions: finalInstructions, directory: experimentsDir });
     
     res.json({
       status: 'success',
