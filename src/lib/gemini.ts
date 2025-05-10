@@ -330,8 +330,6 @@ Return the recommendations as a JSON array of controller objects in the followin
 
 Keep the response concise but informative.`;
 
-    console.log('Sending prompt to Gemini:', prompt);
-
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {

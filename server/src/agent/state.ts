@@ -6,7 +6,7 @@ interface AgentMessage {
 
 interface AgentState {
   id: string;
-  status: 'running' | 'completed' | 'error';
+  status: 'running' | 'completed' | 'error' | 'pending';
   startTime: string;
   lastUpdate: string;
   error?: string;
@@ -31,7 +31,7 @@ class AgentStateManager {
   createState(id: string): AgentState {
     const state: AgentState = {
       id,
-      status: 'running',
+      status: 'pending',
       startTime: new Date().toISOString(),
       lastUpdate: new Date().toISOString(),
       messages: []
@@ -42,7 +42,10 @@ class AgentStateManager {
 
   addMessage(id: string, content: string, type: AgentMessage['type'] = 'info'): AgentState | null {
     const state = this.states.get(id);
-    if (!state) return null;
+    if (!state) {
+      console.warn(`[AgentStateManager] No state found for id: ${id}`);
+      return null;
+    }
 
     const message: AgentMessage = {
       timestamp: new Date().toISOString(),
@@ -50,8 +53,17 @@ class AgentStateManager {
       type
     };
 
+    // Update state based on message type
+    let newStatus = state.status;
+    if (type === 'error' && state.status !== 'error') {
+      newStatus = 'error';
+    } else if (state.status === 'pending' && type === 'info') {
+      newStatus = 'running';
+    }
+
     const updatedState = {
       ...state,
+      status: newStatus,
       messages: [...state.messages, message],
       lastUpdate: new Date().toISOString()
     };
@@ -61,7 +73,10 @@ class AgentStateManager {
 
   updateState(id: string, update: Partial<Omit<AgentState, 'messages'>>): AgentState | null {
     const state = this.states.get(id);
-    if (!state) return null;
+    if (!state) {
+      console.warn(`[AgentStateManager] No state found for id: ${id}`);
+      return null;
+    }
 
     const updatedState = {
       ...state,
