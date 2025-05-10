@@ -1,16 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowDown, ArrowUp } from "lucide-react";
 
 interface Controller {
   id: string;
@@ -25,6 +16,12 @@ interface Controller {
   selected: boolean;
 }
 
+interface CLIMessage {
+  type: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
 interface ExperimentDashboardProps {
   config: any;
   onSelectBest: (controller: Controller) => void;
@@ -32,9 +29,7 @@ interface ExperimentDashboardProps {
 
 const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps) => {
   const [controllers, setControllers] = useState<Controller[]>([]);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [sortField, setSortField] = useState<keyof Controller['metrics']>('steadyStateError');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [cliMessages, setCliMessages] = useState<CLIMessage[]>([]);
   const [selectedController, setSelectedController] = useState<Controller | null>(null);
   const [simulationRunning, setSimulationRunning] = useState(true);
 
@@ -74,25 +69,31 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
     
     setControllers(initialControllers);
     
-    // Initial log
-    setLogs(['Starting controller tuning process...', 'Evaluating initial controller parameters...']);
+    // Initial CLI messages
+    setCliMessages([
+      {
+        type: 'assistant',
+        content: 'Starting controller tuning process...',
+        timestamp: new Date().toISOString()
+      },
+      {
+        type: 'assistant',
+        content: 'Initializing PID and LQR controllers with default parameters...',
+        timestamp: new Date().toISOString()
+      }
+    ]);
     
     // Simulate progress updates
     const updateInterval = setInterval(() => {
       setControllers(prevControllers => {
-        // Clone the previous controllers
         const newControllers = [...prevControllers];
-        
-        // Improve metrics for each controller
         return newControllers.map(controller => {
-          // Don't update if already at max iteration
           if (controller.type === 'PID' && controller.iteration === 5) return controller;
           if (controller.type === 'LQR' && controller.iteration === 5) return controller;
           
           const iterationNum = typeof controller.iteration === 'number' ? controller.iteration : 1;
           const newIteration = iterationNum + 1;
           
-          // Improve metrics based on controller type and iteration
           const multiplier = controller.type === 'PID' ? 0.85 : 0.9;
           
           return {
@@ -108,12 +109,11 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
         });
       });
       
-      // Add new logs
-      setLogs(prevLogs => {
-        const newLogs = [...prevLogs];
+      // Add new CLI messages
+      setCliMessages(prevMessages => {
+        const newMessages = [...prevMessages];
         
-        // Random log messages
-        const logMessages = [
+        const cliResponses = [
           'Analyzing controller response to step input...',
           'Adjusting PID gains to reduce overshoot...',
           'Testing controller stability under wind disturbance...',
@@ -124,10 +124,14 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
           'Testing performance with varying wind conditions...'
         ];
         
-        newLogs.push(logMessages[Math.floor(Math.random() * logMessages.length)]);
+        newMessages.push({
+          type: 'assistant',
+          content: cliResponses[Math.floor(Math.random() * cliResponses.length)],
+          timestamp: new Date().toISOString()
+        });
         
-        // Keep only the last 10 logs
-        return newLogs.slice(-10);
+        // Keep only the last 20 messages
+        return newMessages.slice(-20);
       });
       
     }, 3000);
@@ -137,28 +141,19 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
       clearInterval(updateInterval);
       setSimulationRunning(false);
       
-      setLogs(prevLogs => [...prevLogs, 'Controller tuning process complete. Ready for final selection.']);
+      setCliMessages(prevMessages => [
+        ...prevMessages,
+        {
+          type: 'assistant',
+          content: 'Controller tuning process complete. Ready for final selection.',
+          timestamp: new Date().toISOString()
+        }
+      ]);
     }, 20000);
     
     return () => clearInterval(updateInterval);
   }, [config]);
 
-  const handleSort = (field: keyof Controller['metrics']) => {
-    setSortField(field);
-    setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-  };
-  
-  const sortedControllers = [...controllers].sort((a, b) => {
-    const valueA = a.metrics[sortField];
-    const valueB = b.metrics[sortField];
-    
-    if (sortDirection === 'asc') {
-      return valueA - valueB;
-    } else {
-      return valueB - valueA;
-    }
-  });
-  
   const handleSelectController = (controller: Controller) => {
     setControllers(prev => 
       prev.map(c => ({
@@ -234,106 +229,31 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
         </CardContent>
       </Card>
       
-      {/* Right: Metrics Table & Log */}
+      {/* Right: CLI Interface */}
       <Card className="flex flex-col">
         <CardHeader>
-          <CardTitle>Performance Metrics</CardTitle>
+          <CardTitle>Experiment Log</CardTitle>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col">
-          <div className="rounded-md overflow-x-auto mb-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Controller</TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:text-primary"
-                    onClick={() => handleSort('riseTime')}
-                  >
-                    <div className="flex items-center">
-                      Rise Time
-                      {sortField === 'riseTime' && (
-                        sortDirection === 'asc' ? <ArrowUp className="ml-1 h-3 w-3" /> : <ArrowDown className="ml-1 h-3 w-3" />
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:text-primary"
-                    onClick={() => handleSort('overshoot')}
-                  >
-                    <div className="flex items-center">
-                      Overshoot
-                      {sortField === 'overshoot' && (
-                        sortDirection === 'asc' ? <ArrowUp className="ml-1 h-3 w-3" /> : <ArrowDown className="ml-1 h-3 w-3" />
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:text-primary"
-                    onClick={() => handleSort('steadyStateError')}
-                  >
-                    <div className="flex items-center">
-                      Error
-                      {sortField === 'steadyStateError' && (
-                        sortDirection === 'asc' ? <ArrowUp className="ml-1 h-3 w-3" /> : <ArrowDown className="ml-1 h-3 w-3" />
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:text-primary"
-                    onClick={() => handleSort('energy')}
-                  >
-                    <div className="flex items-center">
-                      Energy
-                      {sortField === 'energy' && (
-                        sortDirection === 'asc' ? <ArrowUp className="ml-1 h-3 w-3" /> : <ArrowDown className="ml-1 h-3 w-3" />
-                      )}
-                    </div>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedControllers.map(controller => (
-                  <TableRow 
-                    key={controller.id} 
-                    className={controller.selected ? 'bg-primary/10' : ''}
-                    onClick={() => handleSelectController(controller)}
-                  >
-                    <TableCell className="font-medium">
-                      {controller.type} #{controller.iteration}
-                    </TableCell>
-                    <TableCell>{controller.metrics.riseTime.toFixed(2)}s</TableCell>
-                    <TableCell>{controller.metrics.overshoot.toFixed(1)}%</TableCell>
-                    <TableCell 
-                      className={
-                        sortField === 'steadyStateError' && 
-                        controller.metrics.steadyStateError === Math.min(
-                          ...controllers.map(c => c.metrics.steadyStateError)
-                        )
-                          ? 'text-primary font-medium'
-                          : ''
-                      }
-                    >
-                      {controller.metrics.steadyStateError.toFixed(3)}m
-                    </TableCell>
-                    <TableCell>{controller.metrics.energy.toFixed(1)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          
-          <div className="flex-grow">
-            <h3 className="font-medium text-sm mb-2">Tuning Log</h3>
-            <div className="bg-secondary p-3 rounded-md h-32 overflow-y-auto text-sm space-y-1">
-              {logs.map((log, i) => (
-                <div key={i} className="flex items-start gap-2">
-                  <Avatar className="h-5 w-5">
-                    <AvatarFallback className="bg-primary text-[10px]">AI</AvatarFallback>
-                  </Avatar>
-                  <p>{log}</p>
+          <div className="bg-black text-green-400 font-mono text-sm p-4 rounded-md h-[500px] overflow-y-auto flex flex-col">
+            {cliMessages.map((message, index) => (
+              <div key={index} className="mb-2">
+                <div className="flex items-start gap-2">
+                  <span className="text-gray-400">
+                    {new Date(message.timestamp).toLocaleTimeString()}
+                  </span>
+                  <span className="text-yellow-400">
+                    {message.type === 'assistant' ? 'Claude:' : 'User:'}
+                  </span>
                 </div>
-              ))}
-            </div>
+                <div className="ml-8 whitespace-pre-wrap">
+                  {message.content}
+                </div>
+              </div>
+            ))}
+            {simulationRunning && (
+              <div className="animate-pulse text-green-400">_</div>
+            )}
           </div>
           
           <div className="mt-4 flex justify-end">

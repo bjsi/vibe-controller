@@ -216,7 +216,6 @@ class DroneController:
           <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
             <li>Controller sample rate is set to 50Hz (20ms)</li>
             <li>Added anti-windup protection for integral term</li>
-            <li>Controller is optimized for the specified wind gust conditions</li>
             <li>Performance may vary on actual hardware - additional tuning may be required</li>
           </ul>
         </div>

@@ -129,16 +129,10 @@ const ControllerSetup = ({ spec, onLaunch }: ControllerSetupProps) => {
                   <div>{spec.plant}</div>
                   
                   <div className="font-medium">Objective:</div>
-                  <div>Hold position at [{spec.objective.hold_position.join(', ')}m]</div>
+                  <div>Hold position</div>
                   
                   <div className="font-medium">Duration:</div>
                   <div>{spec.objective.duration}s</div>
-                  
-                  <div className="font-medium">Wind Gust:</div>
-                  <div>{spec.constraints.wind_gust}</div>
-                  
-                  <div className="font-medium">Visualization:</div>
-                  <div>{spec.simulation}</div>
                 </div>
               </div>
             </div>
