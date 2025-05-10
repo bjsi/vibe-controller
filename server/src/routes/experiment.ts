@@ -3,8 +3,6 @@ import { z } from 'zod';
 import { ensureExperimentDir, saveExperiment, loadExperiment } from '../filesystem.js';
 import { startAgent } from '../agent/agent.js';
 import { agentStateManager } from '../agent/state.js';
-import fs from 'node:fs';
-import path from 'node:path';
 
 const router = Router();
 
@@ -121,19 +119,6 @@ router.get('/get_test_data', async (req, res) => {
   }
 });
 
-async function getExperimentState(id: string) {
-  if (!id) {
-    throw new Error('Experiment ID is required');
-  }
-
-  const state = agentStateManager.getState(id);
-  if (!state) {
-    throw new Error(`No state found for experiment ID: ${id}`);
-  }
-
-  return state;
-}
-
 router.get('/get_experiment_state', async (req, res) => {
   const { id } = req.query;
 
@@ -142,34 +127,24 @@ router.get('/get_experiment_state', async (req, res) => {
   }
 
   try {
-    console.log(`[get_experiment_state] Fetching state for experiment ${id}`);
-    const response = await fetch(`http://localhost:3001/get_experiment_state?id=${id}`, {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
-    });
+    console.log(`[get_experiment_state] Getting state for experiment ${id}`);
+    const state = agentStateManager.getState(id);
     
-    console.log(`[get_experiment_state] Response status: ${response.status}`);
-    console.log(`[get_experiment_state] Response headers:`, response.headers);
-    
-    const responseText = await response.text();
-    console.log(`[get_experiment_state] Raw response:`, responseText.substring(0, 200) + '...');
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}, body: ${responseText}`);
+    if (!state) {
+      console.log(`[get_experiment_state] No state found for experiment ${id}`);
+      return res.status(200).json({
+        status: 'pending',
+        log: [{
+          type: 'assistant',
+          content: 'Waiting for agent to start...',
+          timestamp: new Date().toISOString(),
+          status: 'pending'
+        }]
+      });
     }
-    
-    let stateData;
-    try {
-      stateData = JSON.parse(responseText);
-    } catch (e) {
-      console.error('[get_experiment_state] Failed to parse JSON:', e);
-      throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}...`);
-    }
-    
+
     // Transform the messages to include status information
-    const transformedLog = stateData.messages.map((msg: any) => ({
+    const transformedLog = state.messages.map((msg: any) => ({
       type: 'assistant',
       content: msg.content,
       timestamp: msg.timestamp,
@@ -177,7 +152,7 @@ router.get('/get_experiment_state', async (req, res) => {
     }));
 
     return res.status(200).json({
-      status: stateData.status,
+      status: state.status,
       log: transformedLog
     });
   } catch (error) {
@@ -186,7 +161,7 @@ router.get('/get_experiment_state', async (req, res) => {
       status: 'error',
       log: [{
         type: 'assistant',
-        content: `Error fetching experiment state: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: `Error getting experiment state: ${error instanceof Error ? error.message : 'Unknown error'}`,
         timestamp: new Date().toISOString(),
         status: 'error'
       }]

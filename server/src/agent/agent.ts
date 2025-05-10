@@ -42,6 +42,11 @@ export async function startAgent(options: AgentOptions): Promise<void> {
   // 1) Verify the working directory exists
   if (!fs.existsSync(absDir) || !fs.statSync(absDir).isDirectory()) {
     console.error(`❌ Experiment directory not found: ${absDir}`);
+    agentStateManager.addMessage(id, `Experiment directory not found: ${absDir}`, 'error');
+    agentStateManager.updateState(id, { 
+      status: 'error',
+      error: `Directory not found: ${absDir}`
+    });
     return;
   }
 
@@ -50,20 +55,31 @@ export async function startAgent(options: AgentOptions): Promise<void> {
 
   // Create a new state for this agent run
   agentStateManager.createState(id);
+  agentStateManager.addMessage(id, 'Starting agent process...', 'info');
 
   // 2) Resolve the Claude binary
   let claudePath: string;
   try {
     claudePath = (await execSync('which claude')).toString().trim();
   } catch (err) {
-    console.error('❌ Could not locate `claude` on PATH. Install it or adjust PATH.');
-    agentStateManager.addMessage(id, 'Could not locate claude on PATH', 'error');
+    const errorMsg = 'Could not locate `claude` on PATH. Install it or adjust PATH.';
+    console.error(`❌ ${errorMsg}`);
+    agentStateManager.addMessage(id, errorMsg, 'error');
+    agentStateManager.updateState(id, { 
+      status: 'error',
+      error: errorMsg
+    });
     return;
   }
 
   if (!fs.existsSync(claudePath)) {
-    console.error(`❌ Claude binary not found at: ${claudePath}`);
-    agentStateManager.addMessage(id, `Claude binary not found at: ${claudePath}`, 'error');
+    const errorMsg = `Claude binary not found at: ${claudePath}`;
+    console.error(`❌ ${errorMsg}`);
+    agentStateManager.addMessage(id, errorMsg, 'error');
+    agentStateManager.updateState(id, { 
+      status: 'error',
+      error: errorMsg
+    });
     return;
   }
   console.log(`▶ Using claude at: ${claudePath}`);
@@ -88,8 +104,13 @@ export async function startAgent(options: AgentOptions): Promise<void> {
 
   // 4) Always listen for the 'error' event to catch ENOENT or permission errors
   claudeProc.on('error', err => {
-    console.error('❌ Failed to start Claude process:', err);
-    agentStateManager.addMessage(id, `Failed to start Claude process: ${err.message}`, 'error');
+    const errorMsg = `Failed to start Claude process: ${err.message}`;
+    console.error(`❌ ${errorMsg}`);
+    agentStateManager.addMessage(id, errorMsg, 'error');
+    agentStateManager.updateState(id, { 
+      status: 'error',
+      error: errorMsg
+    });
   });
 
   // 5) Stream stdout/stderr and process messages
@@ -101,26 +122,35 @@ export async function startAgent(options: AgentOptions): Promise<void> {
       const messages = chunk.toString().trim().split('\n');
       for (const msg of messages) {
         if (msg.startsWith('[')) continue; // Skip array markers
-        const parsed = JSON.parse(msg) as AgentMessage;
-        
-        // Extract the main content text
-        const content = parsed.content
-          .filter(c => c.type === 'text')
-          .map(c => c.text)
-          .join(' ');
+        try {
+          const parsed = JSON.parse(msg) as AgentMessage;
           
-        if (content) {
-          agentStateManager.addMessage(id, content, 'info');
+          // Extract the main content text
+          const content = parsed.content
+            .filter(c => c.type === 'text')
+            .map(c => c.text)
+            .join(' ');
+            
+          if (content) {
+            agentStateManager.addMessage(id, content, 'info');
+          }
+        } catch (parseErr) {
+          // Log parsing errors but don't fail the process
+          console.warn(`⚠️ Failed to parse message: ${msg}`);
+          agentStateManager.addMessage(id, `Failed to parse message: ${msg}`, 'warning');
         }
       }
     } catch (err) {
-      // Ignore JSON parsing errors for non-JSON output
+      // Log chunk processing errors but don't fail the process
+      console.warn(`⚠️ Failed to process chunk: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      agentStateManager.addMessage(id, `Failed to process chunk: ${err instanceof Error ? err.message : 'Unknown error'}`, 'warning');
     }
   });
 
   claudeProc.stderr.on('data', (chunk: Buffer) => {
+    const errorMsg = chunk.toString();
     process.stderr.write(chunk);
-    agentStateManager.addMessage(id, chunk.toString(), 'warning');
+    agentStateManager.addMessage(id, errorMsg, 'warning');
   });
 
   // 6) Handle exit
@@ -130,11 +160,12 @@ export async function startAgent(options: AgentOptions): Promise<void> {
       agentStateManager.addMessage(id, 'Claude exited successfully', 'success');
       agentStateManager.updateState(id, { status: 'completed' });
     } else {
-      console.error(`\n❌ Claude exited with code ${code}.`);
-      agentStateManager.addMessage(id, `Claude exited with code ${code}`, 'error');
+      const errorMsg = `Claude exited with code ${code}`;
+      console.error(`\n❌ ${errorMsg}`);
+      agentStateManager.addMessage(id, errorMsg, 'error');
       agentStateManager.updateState(id, { 
         status: 'error',
-        error: `Process exited with code ${code}`
+        error: errorMsg
       });
     }
   });
