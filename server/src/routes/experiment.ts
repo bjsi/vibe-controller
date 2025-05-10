@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { ensureExperimentDir, ensureExperimentsDir, saveExperiment } from '../filesystem.js';
-import { agentStateManager } from '../agent/state.js';
+import { ensureExperimentDir, saveExperiment } from '../filesystem.js';
 import { startAgent } from '../agent/agent.js';
-import path from 'path';
+import { agentStateManager } from '../agent/state.js';
 
 
 const router = Router();
@@ -25,9 +24,8 @@ router.post('/start_experiment', async (req, res) => {
     };
     
     await saveExperiment(id, experimentData);
-    agentStateManager.createState(id);
     const experimentsDir = ensureExperimentDir(id);
-    await startAgent({ instructions, directory: experimentsDir });
+    await startAgent({ id, instructions, directory: experimentsDir });
     
     res.json({
       status: 'success',
@@ -43,6 +41,37 @@ router.post('/start_experiment', async (req, res) => {
       });
     } else {
       throw error;
+    }
+  }
+});
+
+async function getExperimentState(id: string) {
+  if (!id) {
+    throw new Error('Experiment ID is required');
+  }
+
+  const state = agentStateManager.getState(id);
+  if (!state) {
+    throw new Error(`No state found for experiment ID: ${id}`);
+  }
+
+  return state;
+}
+
+router.get('/get_experiment_state', async (req, res) => {
+  try {
+    const { id } = req.query;
+    if (typeof id !== 'string') {
+      return res.status(400).json({ error: 'Invalid experiment ID' });
+    }
+
+    const state = await getExperimentState(id);
+    res.json(state);
+  } catch (error) {
+    if (error instanceof Error) {
+      res.status(404).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
 });
