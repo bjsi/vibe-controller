@@ -21,7 +21,8 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
   const [error, setError] = useState<string | null>(null);
   const [spec, setSpec] = useState(DEFAULT_SPEC);
   const [assumedValues, setAssumedValues] = useState<Set<string>>(new Set());
-
+  const [dataSourceText, setDataSourceText] = useState('');
+  const [outputStructureText, setOutputStructureText] = useState('');
   // When task description is submitted, generate specification and switch to summary tab
   const handleTaskSubmit = async () => {
     if (!taskDescription.trim()) return;
@@ -208,6 +209,95 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                   
                   <div>
                     <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-medium text-sm text-muted-foreground">Control Ranges</h3>
+                      {assumedValues.has('controlRanges') && (
+                        <Badge variant="secondary">Assumed</Badge>
+                      )}
+                    </div>
+                    <div className="space-y-4">
+                      {spec.controls.map((control) => (
+                        <div key={control} className="space-y-2">
+                          <Label className="text-sm font-medium capitalize">{control}</Label>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <Label className="text-xs">Min</Label>
+                              <Input
+                                type="number"
+                                value={spec.controlRanges[control].min}
+                                onChange={(e) => {
+                                  setSpec(prev => ({
+                                    ...prev,
+                                    controlRanges: {
+                                      ...prev.controlRanges,
+                                      [control]: {
+                                        ...prev.controlRanges[control],
+                                        min: parseFloat(e.target.value)
+                                      }
+                                    }
+                                  }));
+                                  setAssumedValues(prev => {
+                                    const next = new Set(prev);
+                                    next.delete('controlRanges');
+                                    return next;
+                                  });
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Max</Label>
+                              <Input
+                                type="number"
+                                value={spec.controlRanges[control].max}
+                                onChange={(e) => {
+                                  setSpec(prev => ({
+                                    ...prev,
+                                    controlRanges: {
+                                      ...prev.controlRanges,
+                                      [control]: {
+                                        ...prev.controlRanges[control],
+                                        max: parseFloat(e.target.value)
+                                      }
+                                    }
+                                  }));
+                                  setAssumedValues(prev => {
+                                    const next = new Set(prev);
+                                    next.delete('controlRanges');
+                                    return next;
+                                  });
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Unit</Label>
+                              <Input
+                                value={spec.controlRanges[control].unit}
+                                onChange={(e) => {
+                                  setSpec(prev => ({
+                                    ...prev,
+                                    controlRanges: {
+                                      ...prev.controlRanges,
+                                      [control]: {
+                                        ...prev.controlRanges[control],
+                                        unit: e.target.value
+                                      }
+                                    }
+                                  }));
+                                  setAssumedValues(prev => {
+                                    const next = new Set(prev);
+                                    next.delete('controlRanges');
+                                    return next;
+                                  });
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-medium text-sm text-muted-foreground">Objective</h3>
                       {assumedValues.has('objective') && (
                         <Badge variant="secondary">Assumed</Badge>
@@ -342,68 +432,31 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                     </div>
                   </div>
                   
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-medium text-sm text-muted-foreground">Simulation Type</h3>
-                      {assumedValues.has('simulation') && (
-                        <Badge variant="secondary">Assumed</Badge>
-                      )}
-                    </div>
-                    <Select
-                      value={spec.simulation}
-                      onValueChange={(value) => {
-                        setSpec(prev => ({ ...prev, simulation: value }));
-                        setAssumedValues(prev => {
-                          const next = new Set(prev);
-                          next.delete('simulation');
-                          return next;
-                        });
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select simulation type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="real-time 3D">Real-time 3D</SelectItem>
-                        <SelectItem value="real-time 2D">Real-time 2D</SelectItem>
-                        <SelectItem value="offline 3D">Offline 3D</SelectItem>
-                        <SelectItem value="offline 2D">Offline 2D</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                   
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-medium text-sm text-muted-foreground">Data Source</h3>
-                      {assumedValues.has('dataSource') && (
-                        <Badge variant="secondary">Assumed</Badge>
-                      )}
-                    </div>
-                    <Textarea
-                      value={spec.dataSource}
-                      onChange={(e) => {
-                        setSpec(prev => ({ ...prev, dataSource: e.target.value }));
-                        setAssumedValues(prev => {
-                          const next = new Set(prev);
-                          next.delete('dataSource');
-                          return next;
-                        });
-                      }}
-                      placeholder="Enter data source or API endpoint information..."
-                      className="min-h-24"
-                    />
-                  </div>
                 </div>
                 
-                {/* Right: Visualization Preview */}
+                {/* Right: Additional Settings */}
                 <div className="bg-card rounded-lg border border-border p-4 h-[400px] overflow-y-auto">
-                  <h3 className="font-medium mb-4">Visualization Preview</h3>
-                  <div className="aspect-video bg-secondary/20 rounded-lg border border-border flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <div className="text-4xl mb-2">
-                        {spec.simulation === 'real-time 3D' ? '3D' : '2D'}
-                      </div>
-                      <p className="text-muted-foreground text-sm">{spec.simulation} visualization will be used</p>
+                  <h3 className="font-medium mb-4">Additional Configuration</h3>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Data Source</Label>
+                      <Textarea 
+                        placeholder="Paste documentation about your data source or API here..."
+                        value={dataSourceText}
+                        onChange={(e) => setDataSourceText(e.target.value)}
+                        className="min-h-24"
+                      />
+
+                      <Label>Output Structure</Label>
+                      <Textarea 
+                        placeholder="Paste documentation about your data source or API here..."
+                        value={outputStructureText}
+                        onChange={(e) => setOutputStructureText(e.target.value)}
+                        className="min-h-24"
+                      />
+                      
                     </div>
                   </div>
                 </div>

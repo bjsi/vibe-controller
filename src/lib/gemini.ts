@@ -13,11 +13,9 @@ Your task is to:
 
 The specification should include:
 - plant: The type of system being controlled (e.g. 'quadcopter3D', 'drone3D')
-- controls: Array of control inputs (e.g. ['roll', 'pitch', 'yaw'])
+- controls: Array of control inputs (e.g. ['roll', 'pitch', 'throttle'])
 - objective: The control objective including position and duration
 - constraints: Environmental and system constraints
-- simulation: The type of simulation to use
-- dataSource: Any data source or API endpoint information
 
 Your questions are suggestions to prompt the user. Ask them concisely and expect concise answers. If responses are incomplete, proceed with educated guesses.`;
 
@@ -34,7 +32,12 @@ export interface ConversationState {
 // Default specification structure
 export const DEFAULT_SPEC = {
   plant: 'drone3D',
-  controls: ['roll', 'pitch', 'yaw'],
+  controls: ['roll', 'pitch', 'throttle'],
+  controlRanges: {
+    roll: { min: -45, max: 45, unit: 'degrees' },
+    pitch: { min: -45, max: 45, unit: 'degrees' },
+    throttle: { min: 0, max: 100, unit: 'percent' }
+  },
   objective: {
     hold_position: [0, 0, 5],
     duration: 30
@@ -157,7 +160,67 @@ For any values not explicitly specified in the task description, use reasonable 
           items: {
             type: SchemaType.STRING
           },
-          description: "Array of control inputs (e.g. ['roll', 'pitch', 'yaw'])"
+          description: "Array of control inputs (e.g. ['roll', 'pitch', 'throttle'])"
+        },
+        controlRanges: {
+          type: SchemaType.OBJECT,
+          description: "Range limits for each control input",
+          properties: {
+            roll: {
+              type: SchemaType.OBJECT,
+              properties: {
+                min: {
+                  type: SchemaType.NUMBER,
+                  description: "Minimum value for the control input"
+                },
+                max: {
+                  type: SchemaType.NUMBER,
+                  description: "Maximum value for the control input"
+                },
+                unit: {
+                  type: SchemaType.STRING,
+                  description: "Unit of measurement (e.g. 'degrees', 'radians', 'm/s')"
+                }
+              },
+              required: ["min", "max", "unit"]
+            },
+            pitch: {
+              type: SchemaType.OBJECT,
+              properties: {
+                min: {
+                  type: SchemaType.NUMBER,
+                  description: "Minimum value for the control input"
+                },
+                max: {
+                  type: SchemaType.NUMBER,
+                  description: "Maximum value for the control input"
+                },
+                unit: {
+                  type: SchemaType.STRING,
+                  description: "Unit of measurement (e.g. 'degrees', 'radians', 'm/s')"
+                }
+              },
+              required: ["min", "max", "unit"]
+            },
+            throttle: {
+              type: SchemaType.OBJECT,
+              properties: {
+                min: {
+                  type: SchemaType.NUMBER,
+                  description: "Minimum throttle percentage"
+                },
+                max: {
+                  type: SchemaType.NUMBER,
+                  description: "Maximum throttle percentage"
+                },
+                unit: {
+                  type: SchemaType.STRING,
+                  description: "Unit of measurement (percent)"
+                }
+              },
+              required: ["min", "max", "unit"]
+            }
+          }
         },
         objective: {
           type: SchemaType.OBJECT,
