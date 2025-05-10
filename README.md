@@ -19,10 +19,10 @@ To run the application in development mode with hot-reload:
 npm install
 
 # Start the development server
-npm run electron:dev
+npm run dev:all
 ```
 
-This will start both the Vite development server and Electron app, allowing you to see your changes in real-time.
+This will start both the Vite development server and the backend server, allowing you to see your changes in real-time.
 
 ### Building for Production
 
@@ -30,13 +30,8 @@ To build the application for production:
 
 ```sh
 # Build the application
-npm run electron:build
+npm run build
 ```
-
-This will create platform-specific installers in the `release` directory:
-- macOS: `.dmg` file
-- Windows: `.exe` installer
-- Linux: `.AppImage` file
 
 ## How can I edit this code?
 
@@ -65,7 +60,7 @@ cd <YOUR_PROJECT_NAME>
 npm i
 
 # Step 4: Start the development server with auto-reloading and an instant preview.
-npm run electron:dev
+npm run dev:all
 ```
 
 **Edit a file directly in GitHub**
@@ -91,7 +86,6 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
-- Electron
 
 ## How can I deploy this project?
 
