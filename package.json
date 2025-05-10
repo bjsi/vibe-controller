@@ -3,17 +3,12 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:electron && npm run build:vite && electron-builder",
+    "build": "vite build",
     "build:dev": "vite build --mode development",
-    "build:vite": "vite build",
-    "build:electron": "tsc -p electron/tsconfig.json && tsc -p electron/preload.tsconfig.json && mv dist-electron/preload.js dist-electron/preload.cjs 2>/dev/null || true",
     "lint": "eslint .",
     "preview": "vite preview",
-    "electron:dev": "concurrently -k \"cross-env NODE_ENV=development vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron . --trace-warnings\" --prefix-colors \"blue.bold,green.bold\" --prefix \"[VITE],[ELECTRON]\" --names \"vite,electron\"",
-    "electron:build": "npm run build",
     "start:agent": "tsx electron/agent.ts"
   },
   "dependencies": {
@@ -77,10 +72,6 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "autoprefixer": "^10.4.20",
-    "concurrently": "^8.2.2",
-    "cross-env": "^7.0.3",
-    "electron": "^29.1.0",
-    "electron-builder": "^24.13.3",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
@@ -91,7 +82,6 @@
     "tsx": "^4.19.4",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.1",
-    "wait-on": "^7.2.0"
+    "vite": "^5.4.1"
   }
 }

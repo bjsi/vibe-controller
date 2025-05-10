@@ -27,8 +27,8 @@ const Index = () => {
   const handleLaunchExperiment = (config: any) => {
     setControllerConfig(config);
     setCurrentStep(3);
-    // Send message to Electron
-    window.electronAPI.startExperiment(JSON.stringify(config));
+    // Log experiment start
+    console.log('Starting experiment with config:', config);
   };
   
   const handleSelectBest = (controller: any) => {
