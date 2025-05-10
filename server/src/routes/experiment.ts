@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { saveExperiment } from '../filesystem.js';
+import { agentStateManager } from '../agent/state.js';
+import { startAgent } from '../agent/agent.js';
 
 const router = Router();
 
@@ -21,6 +23,8 @@ router.post('/start_experiment', async (req, res) => {
     };
     
     await saveExperiment(id, experimentData);
+    agentStateManager.createState(id);
+    await startAgent({ instructions, directory: id });
     
     res.json({
       status: 'success',

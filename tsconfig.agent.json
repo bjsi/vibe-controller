@@ -11,7 +11,7 @@
     "rootDir": ".",
     "allowJs": true
   },
-  "include": ["server/src/agent.ts", "electron/**/*", "server/src/filesystem.ts"],
+  "include": ["server/src/agent/agent.ts", "electron/**/*", "server/src/filesystem.ts"],
   "ts-node": {
     "esm": true,
     "experimentalSpecifierResolution": "node"
