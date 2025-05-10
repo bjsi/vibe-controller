@@ -14,7 +14,7 @@ Your task is to:
 The specification should include:
 - plant: The type of system being controlled (e.g. 'quadcopter3D', 'drone3D')
 - controls: Array of control inputs (e.g. ['roll', 'pitch', 'throttle'])
-- objective: The control objective including position and duration
+- objective: The control objective including position and duration (e.g 30s)
 - constraints: Environmental and system constraints
 
 Your questions are suggestions to prompt the user. Ask them concisely and expect concise answers. If responses are incomplete, proceed with educated guesses.`;
@@ -57,10 +57,8 @@ export const DEFAULT_SPEC = {
   },
   constraints: {
     wind_gust: '±2m/s',
-    sample_time: 0.02
-  },
-  simulation: 'real-time 3D',
-  dataSource: ''
+    sample_time: 0.1
+  }
 };
 
 // Initialize a new conversation
@@ -263,23 +261,13 @@ For any values not explicitly specified in the task description, use reasonable 
             },
             sample_time: {
               type: SchemaType.NUMBER,
-              description: "Sample time in seconds"
+              description: "Sample time in seconds (e.g 0.1)"
             }
           },
           required: ["wind_gust", "sample_time"]
-        },
-        simulation: {
-          type: SchemaType.STRING,
-          description: "Type of simulation",
-          enum: ["real-time 3D", "real-time 2D", "offline 3D", "offline 2D"],
-          format: "enum"
-        },
-        dataSource: {
-          type: SchemaType.STRING,
-          description: "Data source or API endpoint information"
         }
       },
-      required: ["plant", "controls", "objective", "constraints", "simulation", "dataSource"]
+      required: ["plant", "controls", "objective", "constraints"]
     };
 
     const result = await model.generateContent({
