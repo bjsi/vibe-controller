@@ -99,8 +99,8 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                 <Textarea
                   id="description"
                   className="min-h-32 text-base"
-                  placeholder="For example: Design a drone controller that can hover steadily at 5 meters height even in the presence of wind gusts."
-                  value={taskDescription || "Design a drone controller that can hover steadily at 5 meters height even in the presence of wind gusts."}
+                  placeholder="For example: Design a drone controller that can hover steadily in the presence of wind gusts."
+                  value={taskDescription || "Design a drone controller that can hover steadily in the presence of wind gusts."}
                   onChange={(e) => setTaskDescription(e.target.value)}
                   onKeyDown={handleKeyPress}
                 />
@@ -313,63 +313,6 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label className="w-24">Position (x,y,z):</Label>
-                        <Input
-                          type="number"
-                          value={spec.objective.hold_position[0]}
-                          onChange={(e) => {
-                            const newPosition = [...spec.objective.hold_position];
-                            newPosition[0] = parseFloat(e.target.value);
-                            setSpec(prev => ({
-                              ...prev,
-                              objective: { ...prev.objective, hold_position: newPosition }
-                            }));
-                            setAssumedValues(prev => {
-                              const next = new Set(prev);
-                              next.delete('objective');
-                              return next;
-                            });
-                          }}
-                          className="w-20"
-                        />
-                        <Input
-                          type="number"
-                          value={spec.objective.hold_position[1]}
-                          onChange={(e) => {
-                            const newPosition = [...spec.objective.hold_position];
-                            newPosition[1] = parseFloat(e.target.value);
-                            setSpec(prev => ({
-                              ...prev,
-                              objective: { ...prev.objective, hold_position: newPosition }
-                            }));
-                            setAssumedValues(prev => {
-                              const next = new Set(prev);
-                              next.delete('objective');
-                              return next;
-                            });
-                          }}
-                          className="w-20"
-                        />
-                        <Input
-                          type="number"
-                          value={spec.objective.hold_position[2]}
-                          onChange={(e) => {
-                            const newPosition = [...spec.objective.hold_position];
-                            newPosition[2] = parseFloat(e.target.value);
-                            setSpec(prev => ({
-                              ...prev,
-                              objective: { ...prev.objective, hold_position: newPosition }
-                            }));
-                            setAssumedValues(prev => {
-                              const next = new Set(prev);
-                              next.delete('objective');
-                              return next;
-                            });
-                          }}
-                          className="w-20"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
                         <Label className="w-24">Duration (s):</Label>
                         <Input
                           type="number"
@@ -399,24 +342,6 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label className="w-24">Wind Gust:</Label>
-                        <Input
-                          value={spec.constraints.wind_gust}
-                          onChange={(e) => {
-                            setSpec(prev => ({
-                              ...prev,
-                              constraints: { ...prev.constraints, wind_gust: e.target.value }
-                            }));
-                            setAssumedValues(prev => {
-                              const next = new Set(prev);
-                              next.delete('constraints');
-                              return next;
-                            });
-                          }}
-                          className="w-32"
-                        />
-                      </div>
                       <div className="flex items-center gap-2">
                         <Label className="w-24">Sample Time:</Label>
                         <Input

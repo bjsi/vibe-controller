@@ -28,7 +28,7 @@ export const startExperiment = async (config: ExperimentConfig): Promise<Experim
     // Format the instructions as a detailed text description
     const instructions = formatExperimentInstructions(config);
     
-    const response = await fetch(`${API_BASE_URL}/experiment/start_experiment`, {
+    const response = await fetch(`${API_BASE_URL}/start_experiment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -68,8 +68,8 @@ System Specification:
 - Plant Type: ${spec.plant}
 - Control Inputs: ${spec.controls.join(', ')}
 - Control Ranges: ${JSON.stringify(spec.controlRanges, null, 2)}
-- Objective: Hold position at [${spec.objective.hold_position.join(', ')}m] for ${spec.objective.duration}s
-- Constraints: Wind gust ${spec.constraints.wind_gust}, Sample time ${spec.constraints.sample_time}s
+- Objective: Hold position for ${spec.objective.duration}s
+- Control Loop: Running at ${spec.constraints.sample_time}s sample rate (${1/spec.constraints.sample_time}Hz)
 - Visualization: ${spec.simulation}
 
 Selected Controllers:

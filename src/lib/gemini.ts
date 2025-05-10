@@ -52,11 +52,9 @@ export const DEFAULT_SPEC = {
     throttle: { min: 0, max: 100, unit: 'percent' }
   },
   objective: {
-    hold_position: [0, 0, 5],
     duration: 30
   },
   constraints: {
-    wind_gust: '±2m/s',
     sample_time: 0.1
   }
 };
@@ -236,35 +234,22 @@ For any values not explicitly specified in the task description, use reasonable 
         objective: {
           type: SchemaType.OBJECT,
           properties: {
-            hold_position: {
-              type: SchemaType.ARRAY,
-              items: {
-                type: SchemaType.NUMBER
-              },
-              minItems: 3,
-              maxItems: 3,
-              description: "Target position [x, y, z] in meters"
-            },
             duration: {
               type: SchemaType.NUMBER,
               description: "Duration in seconds"
             }
           },
-          required: ["hold_position", "duration"]
+          required: ["duration"]
         },
         constraints: {
           type: SchemaType.OBJECT,
           properties: {
-            wind_gust: {
-              type: SchemaType.STRING,
-              description: "Wind gust specification (e.g. '±2m/s')"
-            },
             sample_time: {
               type: SchemaType.NUMBER,
               description: "Sample time in seconds (e.g 0.1)"
             }
           },
-          required: ["wind_gust", "sample_time"]
+          required: ["sample_time"]
         }
       },
       required: ["plant", "controls", "objective", "constraints"]
