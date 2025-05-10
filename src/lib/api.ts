@@ -28,7 +28,7 @@ export const startExperiment = async (config: ExperimentConfig): Promise<Experim
     // Format the instructions as a detailed text description
     const instructions = formatExperimentInstructions(config);
     
-    const response = await fetch(`${API_BASE_URL}/experiment/start_experiment`, {
+    const response = await fetch(`${API_BASE_URL}/start_experiment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

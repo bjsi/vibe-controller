@@ -25,10 +25,15 @@ const Index = () => {
   };
   
   const handleLaunchExperiment = (config: any) => {
-    setControllerConfig(config);
+    // Ensure config has an id
+    const experimentConfig = {
+      ...config,
+      id: `exp-${Date.now()}` // Generate a unique ID for the experiment
+    };
+    setControllerConfig(experimentConfig);
     setCurrentStep(3);
     // Log experiment start
-    console.log('Starting experiment with config:', config);
+    console.log('Starting experiment with config:', experimentConfig);
   };
   
   const handleSelectBest = (controller: any) => {
@@ -65,7 +70,7 @@ const Index = () => {
             />
           )}
           
-          {currentStep === 3 && controllerConfig && (
+          {currentStep === 3 && (
             <ExperimentDashboard 
               config={controllerConfig}
               onSelectBest={handleSelectBest}

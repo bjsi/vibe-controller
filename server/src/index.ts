@@ -3,7 +3,7 @@ import cors from 'cors';
 import { config } from 'dotenv';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFoundHandler } from './middleware/notFoundHandler.js';
-import experimentRouter from './routes/experiment.js';
+import experimentRoutes from './routes/experiment.js';
 
 // Load environment variables
 config();
@@ -27,11 +27,12 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+app.use('/api', experimentRoutes);
 
-app.use('/api/experiment', experimentRouter);
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
 
 // Error handling
 app.use(notFoundHandler);
@@ -39,5 +40,5 @@ app.use(errorHandler);
 
 // Start server
 app.listen(port, () => {
-  console.log(`🚀 Server running at http://localhost:${port}`);
+  console.log(`Server is running on port ${port}`);
 }); 

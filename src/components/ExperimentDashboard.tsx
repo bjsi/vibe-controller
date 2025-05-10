@@ -20,11 +20,27 @@ interface CLIMessage {
   type: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  status?: 'info' | 'warning' | 'error' | 'success';
 }
 
 interface ExperimentDashboardProps {
-  config: any;
+  config: {
+    id?: string;
+    selectedControllers?: {
+      pid?: boolean;
+      lqr?: boolean;
+    };
+  } | null;
   onSelectBest: (controller: Controller) => void;
+}
+
+interface ExperimentState {
+  status: 'running' | 'completed' | 'error' | 'ended';
+  log: Array<{
+    type: 'assistant' | 'user';
+    content: string;
+    timestamp: string;
+  }>;
 }
 
 const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps) => {
@@ -32,70 +48,61 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
   const [cliMessages, setCliMessages] = useState<CLIMessage[]>([]);
   const [selectedController, setSelectedController] = useState<Controller | null>(null);
   const [simulationRunning, setSimulationRunning] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [agentState, setAgentState] = useState<ExperimentState>({ status: 'running', log: [] });
+  const [polling, setPolling] = useState(true);
 
   useEffect(() => {
-    // Simulate controllers being generated and tuned
+    if (!config) {
+      setIsLoading(true);
+      setCliMessages([
+        {
+          type: 'assistant',
+          content: 'Waiting for experiment configuration...',
+          timestamp: new Date().toISOString()
+        }
+      ]);
+      return;
+    }
+
+    setIsLoading(false);
     const initialControllers = [];
-    
-    if (config.selectedControllers.pid) {
+    if (config.selectedControllers?.pid) {
       initialControllers.push({
         id: 'pid-1',
         type: 'PID',
         iteration: 1,
-        metrics: {
-          riseTime: 1.2,
-          overshoot: 12.5,
-          steadyStateError: 0.08,
-          energy: 18.2
-        },
+        metrics: { riseTime: 1.2, overshoot: 12.5, steadyStateError: 0.08, energy: 18.2 },
         selected: false
       });
     }
-    
-    if (config.selectedControllers.lqr) {
+    if (config.selectedControllers?.lqr) {
       initialControllers.push({
         id: 'lqr-1',
         type: 'LQR',
         iteration: 1,
-        metrics: {
-          riseTime: 0.9,
-          overshoot: 8.2,
-          steadyStateError: 0.05,
-          energy: 22.1
-        },
+        metrics: { riseTime: 0.9, overshoot: 8.2, steadyStateError: 0.05, energy: 22.1 },
         selected: false
       });
     }
-    
     setControllers(initialControllers);
-    
-    // Initial CLI messages
+
     setCliMessages([
       {
         type: 'assistant',
-        content: 'Starting controller tuning process...',
-        timestamp: new Date().toISOString()
-      },
-      {
-        type: 'assistant',
-        content: 'Initializing PID and LQR controllers with default parameters...',
+        content: `Starting experiment ${config.id || 'process'}... Waiting for agent outputs.`,
         timestamp: new Date().toISOString()
       }
     ]);
-    
-    // Simulate progress updates
-    const updateInterval = setInterval(() => {
+
+    const controllerUpdateInterval = setInterval(() => {
       setControllers(prevControllers => {
-        const newControllers = [...prevControllers];
-        return newControllers.map(controller => {
+        return prevControllers.map(controller => {
           if (controller.type === 'PID' && controller.iteration === 5) return controller;
           if (controller.type === 'LQR' && controller.iteration === 5) return controller;
-          
           const iterationNum = typeof controller.iteration === 'number' ? controller.iteration : 1;
           const newIteration = iterationNum + 1;
-          
           const multiplier = controller.type === 'PID' ? 0.85 : 0.9;
-          
           return {
             ...controller,
             iteration: newIteration,
@@ -108,51 +115,93 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
           };
         });
       });
-      
-      // Add new CLI messages
-      setCliMessages(prevMessages => {
-        const newMessages = [...prevMessages];
-        
-        const cliResponses = [
-          'Analyzing controller response to step input...',
-          'Adjusting PID gains to reduce overshoot...',
-          'Testing controller stability under wind disturbance...',
-          'Optimizing LQR cost matrix for better energy efficiency...',
-          'Evaluating transient response characteristics...',
-          'Recalculating controller parameters based on simulation results...',
-          'Reducing steady-state position error...',
-          'Testing performance with varying wind conditions...'
-        ];
-        
-        newMessages.push({
-          type: 'assistant',
-          content: cliResponses[Math.floor(Math.random() * cliResponses.length)],
-          timestamp: new Date().toISOString()
-        });
-        
-        // Keep only the last 20 messages
-        return newMessages.slice(-20);
-      });
-      
     }, 3000);
-    
-    // Stop the simulation after some time
-    setTimeout(() => {
-      clearInterval(updateInterval);
+
+    const overallSimulationTimeout = setTimeout(() => {
       setSimulationRunning(false);
-      
       setCliMessages(prevMessages => [
         ...prevMessages,
         {
           type: 'assistant',
-          content: 'Controller tuning process complete. Ready for final selection.',
+          content: 'Experiment run concluded by dashboard timer. Check agent state for final status.',
           timestamp: new Date().toISOString()
-        }
-      ]);
-    }, 20000);
-    
-    return () => clearInterval(updateInterval);
+        } as CLIMessage
+      ].slice(-20));
+    }, 30000);
+
+    return () => {
+      clearInterval(controllerUpdateInterval);
+      clearTimeout(overallSimulationTimeout);
+    };
   }, [config]);
+
+  useEffect(() => {
+    if (!config?.id) {
+      return;
+    }
+
+    const experimentId = config.id;
+    let isMounted = true;
+
+    const fetchAgentState = async () => {
+      try {
+        console.log('[ExperimentDashboard] Fetching state for experiment', experimentId);
+        const response = await fetch(`http://localhost:3000/api/get_experiment_state?id=${experimentId}`, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+        console.log('[ExperimentDashboard] Response status:', response.status);
+        console.log('[ExperimentDashboard] Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        const responseText = await response.text();
+        console.log('[ExperimentDashboard] Raw response:', responseText.substring(0, 200) + '...');
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}, body: ${responseText}`);
+        }
+        
+        let stateData;
+        try {
+          stateData = JSON.parse(responseText);
+        } catch (e) {
+          console.error('[ExperimentDashboard] Failed to parse JSON:', e);
+          throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}...`);
+        }
+        
+        console.log('[ExperimentDashboard] Received state data:', stateData);
+        
+        if (stateData.status === 'completed' || stateData.status === 'error') {
+          setPolling(false);
+        }
+        
+        setAgentState(stateData);
+      } catch (error) {
+        console.error('[ExperimentDashboard] Failed to fetch or process agent state:', error);
+        setAgentState(prev => ({
+          ...prev,
+          log: [
+            ...prev.log,
+            {
+              type: 'assistant',
+              content: `Error fetching state: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              timestamp: new Date().toISOString(),
+              status: 'error'
+            }
+          ]
+        }));
+      }
+    };
+
+    if (simulationRunning) {
+      fetchAgentState();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [config?.id, simulationRunning]);
 
   const handleSelectController = (controller: Controller) => {
     setControllers(prev => 
@@ -170,6 +219,21 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
       onSelectBest(selectedController);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full max-w-6xl mx-auto animate-fade-in">
+        <Card className="lg:col-span-3">
+          <CardContent className="flex items-center justify-center h-[500px]">
+            <div className="flex flex-col items-center">
+              <div className="h-10 w-10 border-t-2 border-primary rounded-full animate-spin-slow mb-3"></div>
+              <p className="text-lg">Loading experiment configuration...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full max-w-6xl mx-auto animate-fade-in">
@@ -242,11 +306,21 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
                   <span className="text-gray-400">
                     {new Date(message.timestamp).toLocaleTimeString()}
                   </span>
-                  <span className="text-yellow-400">
+                  <span className={`${
+                    message.status === 'error' ? 'text-red-400' :
+                    message.status === 'warning' ? 'text-yellow-400' :
+                    message.status === 'success' ? 'text-green-400' :
+                    'text-blue-400'
+                  }`}>
                     {message.type === 'assistant' ? 'Claude:' : 'User:'}
                   </span>
                 </div>
-                <div className="ml-8 whitespace-pre-wrap">
+                <div className={`ml-8 whitespace-pre-wrap ${
+                  message.status === 'error' ? 'text-red-400' :
+                  message.status === 'warning' ? 'text-yellow-400' :
+                  message.status === 'success' ? 'text-green-400' :
+                  'text-gray-300'
+                }`}>
                   {message.content}
                 </div>
               </div>
