@@ -1,17 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { X } from "lucide-react";
-import { initializeConversation, sendMessage, generateSpecification, type ConversationState } from '@/lib/gemini';
-
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
+import { generateSpecification, DEFAULT_SPEC } from '@/lib/gemini';
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 interface SpecificationBuilderProps {
   onConfirm: (spec: any) => void;
@@ -20,101 +17,45 @@ interface SpecificationBuilderProps {
 const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
   const [activeTab, setActiveTab] = useState('description');
   const [taskDescription, setTaskDescription] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [dataSourceText, setDataSourceText] = useState('');
-  const [responseStructureText, setResponseStructureText] = useState('');
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [pastedImage, setPastedImage] = useState<string | null>(null);
-  const [conversationState, setConversationState] = useState<ConversationState | null>(null);
-  
-  // Spec state
-  const [spec, setSpec] = useState({
-    plant: 'drone3D',
-    controls: ['roll', 'pitch', 'yaw'],
-    objective: {
-      hold_position: [0, 0, 5],
-      duration: 30
-    },
-    constraints: {
-      wind_gust: '±2m/s',
-      sample_time: 0.02
-    },
-    simulation: 'real-time 3D',
-    dataSource: ''
-  });
+  const [error, setError] = useState<string | null>(null);
+  const [spec, setSpec] = useState(DEFAULT_SPEC);
+  const [assumedValues, setAssumedValues] = useState<Set<string>>(new Set());
 
-  // When task description is submitted, switch to clarify tab and initialize conversation
+  // When task description is submitted, generate specification and switch to summary tab
   const handleTaskSubmit = async () => {
     if (!taskDescription.trim()) return;
     
-    setActiveTab('clarify');
     setIsLoading(true);
+    setError(null);
     
     try {
-      // Initialize conversation with Gemini
-      const initialState = initializeConversation(taskDescription);
-      setConversationState(initialState);
-      
-      // Get initial response
-      const updatedState = await sendMessage(initialState, taskDescription);
-      setConversationState(updatedState);
-      
-      // Update UI messages
-      setMessages([
-        { role: 'assistant', content: updatedState.messages[updatedState.messages.length - 1].parts[0].text }
-      ]);
-      
-      // Update spec if provided
-      if (updatedState.spec) {
-        setSpec(updatedState.spec);
-      }
-    } catch (error) {
-      console.error('Error initializing conversation:', error);
-      setMessages([
-        { role: 'assistant', content: 'I apologize, but I encountered an error. Please try again.' }
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      // Generate specification directly from task description
+      const generatedSpec = await generateSpecification({
+        messages: [
+          {
+            role: 'user',
+            parts: [{ text: taskDescription }]
+          }
+        ],
+        spec: DEFAULT_SPEC,
+        questionsAnswered: true
+      });
 
-  const handleSendMessage = async () => {
-    if (!userInput.trim() || !conversationState) return;
-    
-    // Add user message to UI
-    const newMessage: Message = { role: 'user', content: userInput };
-    setMessages(prev => [...prev, newMessage]);
-    setUserInput('');
-    setIsLoading(true);
-    
-    try {
-      // Send message to Gemini
-      const updatedState = await sendMessage(conversationState, userInput);
-      setConversationState(updatedState);
+      // Compare with default spec to identify assumed values
+      const newAssumedValues = new Set<string>();
+      Object.entries(generatedSpec).forEach(([key, value]) => {
+        if (JSON.stringify(value) === JSON.stringify(DEFAULT_SPEC[key as keyof typeof DEFAULT_SPEC])) {
+          newAssumedValues.add(key);
+        }
+      });
+      setAssumedValues(newAssumedValues);
       
-      // Update UI messages
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: updatedState.messages[updatedState.messages.length - 1].parts[0].text }
-      ]);
-      
-      // Update spec if provided
-      if (updatedState.spec) {
-        setSpec(updatedState.spec);
-      }
-      
-      // If all questions are answered, move to summary tab
-      if (updatedState.questionsAnswered) {
-        setActiveTab('summary');
-      }
+      setSpec(generatedSpec);
+      setActiveTab('summary');
     } catch (error) {
-      console.error('Error sending message:', error);
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: 'I apologize, but I encountered an error. Please try again.' }
-      ]);
+      console.error('Error generating specification:', error);
+      setError('Failed to generate specification. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -123,45 +64,7 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
-    }
-  };
-  
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const items = e.clipboardData.items;
-    
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        const blob = items[i].getAsFile();
-        if (blob) {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            if (event.target && typeof event.target.result === 'string') {
-              setPastedImage(event.target.result);
-            }
-          };
-          reader.readAsDataURL(blob);
-          break;
-        }
-      }
-    }
-  };
-  
-  const handleRemovePastedImage = () => {
-    setPastedImage(null);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Handle data file
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target && typeof event.target.result === 'string') {
-          setDataSourceText(event.target.result);
-        }
-      };
-      reader.readAsText(file);
+      handleTaskSubmit();
     }
   };
 
@@ -171,15 +74,20 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
         <CardHeader>
           <CardTitle className="text-2xl">Specification Builder</CardTitle>
           <CardDescription>
-            Describe your control problem and we'll help you create a specification
+            Describe your control problem and we'll generate a specification
           </CardDescription>
         </CardHeader>
         
         <CardContent>
+          {error && (
+            <div className="mb-4 p-4 bg-destructive/10 text-destructive rounded-md">
+              {error}
+            </div>
+          )}
+          
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="description">Task Description</TabsTrigger>
-              <TabsTrigger value="clarify">Clarify & Build</TabsTrigger>
               <TabsTrigger value="summary">Specification Summary</TabsTrigger>
             </TabsList>
             
@@ -195,153 +103,15 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                   placeholder="For example: Design a drone controller that can hover steadily at 5 meters height even in the presence of wind gusts."
                   value={taskDescription || "Design a drone controller that can hover steadily at 5 meters height even in the presence of wind gusts."}
                   onChange={(e) => setTaskDescription(e.target.value)}
+                  onKeyDown={handleKeyPress}
                 />
               </div>
               <div className="pt-4 flex justify-end">
                 <Button 
                   onClick={handleTaskSubmit}
-                  disabled={!taskDescription.trim()}
+                  disabled={!taskDescription.trim() || isLoading}
                 >
-                  Continue
-                </Button>
-              </div>
-            </TabsContent>
-            
-            {/* Clarify & Build Tab */}
-            <TabsContent value="clarify" className="space-y-6 mt-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left: Chat Dialog */}
-                <div className="bg-card rounded-lg border border-border p-4 h-[400px] flex flex-col">
-                  <h3 className="font-medium mb-2">Clarification Dialog</h3>
-                  
-                  <div className="flex-grow overflow-y-auto mb-4 flex flex-col gap-4 pr-2">
-                    {messages.map((message, index) => (
-                      <div 
-                        key={index}
-                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div 
-                          className={`flex gap-3 max-w-[80%] ${
-                            message.role === 'user' ? 'flex-row-reverse' : ''
-                          }`}
-                        >
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className={message.role === 'user' ? 'bg-primary' : 'bg-secondary'}>
-                              {message.role === 'user' ? 'U' : 'AI'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div 
-                            className={`rounded-lg p-3 ${
-                              message.role === 'user'
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-secondary text-secondary-foreground'
-                            }`}
-                          >
-                            {message.content.split('\n').map((line, i) => (
-                              <p key={i} className={i > 0 ? 'mt-2' : ''}>{line}</p>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {isLoading && (
-                      <div className="flex justify-start">
-                        <div className="flex gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-secondary">AI</AvatarFallback>
-                          </Avatar>
-                          <div className="flex items-center space-x-2 bg-secondary rounded-lg p-4">
-                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-0"></div>
-                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></div>
-                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-300"></div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="border-t border-border pt-3">
-                    {pastedImage && (
-                      <div className="mb-2 relative inline-block">
-                        <img 
-                          src={pastedImage} 
-                          alt="Pasted content" 
-                          className="max-h-20 rounded-md border border-border" 
-                        />
-                        <Button 
-                          variant="destructive" 
-                          size="icon"
-                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                          onClick={handleRemovePastedImage}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
-                    <div className="flex items-center space-x-2">
-                      <textarea
-                        className="flex h-10 w-full rounded-md border-0 bg-secondary px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                        placeholder="Type your response or paste an image..."
-                        value={userInput}
-                        onChange={(e) => setUserInput(e.target.value)}
-                        onKeyDown={handleKeyPress}
-                        onPaste={handlePaste}
-                        disabled={isLoading}
-                        rows={1}
-                      />
-                      <Button 
-                        onClick={handleSendMessage} 
-                        disabled={!userInput.trim() || isLoading}
-                        size="sm"
-                      >
-                        Send
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Right: Additional Settings */}
-                <div className="bg-card rounded-lg border border-border p-4 h-[400px] overflow-y-auto">
-                  <h3 className="font-medium mb-4">Additional Configuration</h3>
-                  
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Data Source</Label>
-                      <Textarea 
-                        placeholder="Paste documentation and request examples about your data source or API here..."
-                        value={dataSourceText}
-                        onChange={(e) => setDataSourceText(e.target.value)}
-                        className="min-h-24"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Sample Response Structure</Label>
-                      <Textarea 
-                        placeholder="Paste a sample response from the API here..."
-                        value={responseStructureText}
-                        onChange={(e) => setResponseStructureText(e.target.value)}
-                        className="min-h-24"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="pt-2 flex justify-between">
-                <Button 
-                  variant="outline"
-                  onClick={() => setActiveTab('description')}
-                >
-                  Back
-                </Button>
-                <Button 
-                  onClick={() => setActiveTab('summary')}
-                >
-                  Continue
+                  {isLoading ? 'Generating...' : 'Generate Specification'}
                 </Button>
               </div>
             </TabsContent>
@@ -352,45 +122,283 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                 {/* Left: Specification Details */}
                 <div className="space-y-6">
                   <div>
-                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Plant Type</h3>
-                    <p className="text-base">{spec.plant}</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-medium text-sm text-muted-foreground">Plant Type</h3>
+                      {assumedValues.has('plant') && (
+                        <Badge variant="secondary">Assumed</Badge>
+                      )}
+                    </div>
+                    <Select
+                      value={spec.plant}
+                      onValueChange={(value) => {
+                        setSpec(prev => ({ ...prev, plant: value }));
+                        setAssumedValues(prev => {
+                          const next = new Set(prev);
+                          next.delete('plant');
+                          return next;
+                        });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select plant type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="drone3D">3D Drone</SelectItem>
+                        <SelectItem value="quadcopter3D">3D Quadcopter</SelectItem>
+                        <SelectItem value="fixedWing3D">3D Fixed Wing</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   
                   <div>
-                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Control Inputs</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-medium text-sm text-muted-foreground">Control Inputs</h3>
+                      {assumedValues.has('controls') && (
+                        <Badge variant="secondary">Assumed</Badge>
+                      )}
+                    </div>
                     <div className="flex flex-wrap gap-2">
-                      {spec.controls.map(control => (
-                        <span key={control} className="px-2 py-1 bg-secondary rounded-md text-sm">
-                          {control}
-                        </span>
+                      {spec.controls.map((control, index) => (
+                        <div key={control} className="flex items-center gap-2">
+                          <Input
+                            value={control}
+                            onChange={(e) => {
+                              const newControls = [...spec.controls];
+                              newControls[index] = e.target.value;
+                              setSpec(prev => ({ ...prev, controls: newControls }));
+                              setAssumedValues(prev => {
+                                const next = new Set(prev);
+                                next.delete('controls');
+                                return next;
+                              });
+                            }}
+                            className="w-24"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              const newControls = spec.controls.filter((_, i) => i !== index);
+                              setSpec(prev => ({ ...prev, controls: newControls }));
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
                       ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSpec(prev => ({
+                            ...prev,
+                            controls: [...prev.controls, 'new_control']
+                          }));
+                          setAssumedValues(prev => {
+                            const next = new Set(prev);
+                            next.delete('controls');
+                            return next;
+                          });
+                        }}
+                      >
+                        Add Control
+                      </Button>
                     </div>
                   </div>
                   
                   <div>
-                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Objective</h3>
-                    <p className="text-sm">Hold position at [{spec.objective.hold_position.join(', ')}m]</p>
-                    <p className="text-sm">Duration: {spec.objective.duration}s</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-medium text-sm text-muted-foreground">Objective</h3>
+                      {assumedValues.has('objective') && (
+                        <Badge variant="secondary">Assumed</Badge>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label className="w-24">Position (x,y,z):</Label>
+                        <Input
+                          type="number"
+                          value={spec.objective.hold_position[0]}
+                          onChange={(e) => {
+                            const newPosition = [...spec.objective.hold_position];
+                            newPosition[0] = parseFloat(e.target.value);
+                            setSpec(prev => ({
+                              ...prev,
+                              objective: { ...prev.objective, hold_position: newPosition }
+                            }));
+                            setAssumedValues(prev => {
+                              const next = new Set(prev);
+                              next.delete('objective');
+                              return next;
+                            });
+                          }}
+                          className="w-20"
+                        />
+                        <Input
+                          type="number"
+                          value={spec.objective.hold_position[1]}
+                          onChange={(e) => {
+                            const newPosition = [...spec.objective.hold_position];
+                            newPosition[1] = parseFloat(e.target.value);
+                            setSpec(prev => ({
+                              ...prev,
+                              objective: { ...prev.objective, hold_position: newPosition }
+                            }));
+                            setAssumedValues(prev => {
+                              const next = new Set(prev);
+                              next.delete('objective');
+                              return next;
+                            });
+                          }}
+                          className="w-20"
+                        />
+                        <Input
+                          type="number"
+                          value={spec.objective.hold_position[2]}
+                          onChange={(e) => {
+                            const newPosition = [...spec.objective.hold_position];
+                            newPosition[2] = parseFloat(e.target.value);
+                            setSpec(prev => ({
+                              ...prev,
+                              objective: { ...prev.objective, hold_position: newPosition }
+                            }));
+                            setAssumedValues(prev => {
+                              const next = new Set(prev);
+                              next.delete('objective');
+                              return next;
+                            });
+                          }}
+                          className="w-20"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="w-24">Duration (s):</Label>
+                        <Input
+                          type="number"
+                          value={spec.objective.duration}
+                          onChange={(e) => {
+                            setSpec(prev => ({
+                              ...prev,
+                              objective: { ...prev.objective, duration: parseFloat(e.target.value) }
+                            }));
+                            setAssumedValues(prev => {
+                              const next = new Set(prev);
+                              next.delete('objective');
+                              return next;
+                            });
+                          }}
+                          className="w-20"
+                        />
+                      </div>
+                    </div>
                   </div>
                   
                   <div>
-                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Constraints</h3>
-                    <p className="text-sm">Wind gust: {spec.constraints.wind_gust}</p>
-                    <p className="text-sm">Sample time: {spec.constraints.sample_time}s</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-medium text-sm text-muted-foreground">Constraints</h3>
+                      {assumedValues.has('constraints') && (
+                        <Badge variant="secondary">Assumed</Badge>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label className="w-24">Wind Gust:</Label>
+                        <Input
+                          value={spec.constraints.wind_gust}
+                          onChange={(e) => {
+                            setSpec(prev => ({
+                              ...prev,
+                              constraints: { ...prev.constraints, wind_gust: e.target.value }
+                            }));
+                            setAssumedValues(prev => {
+                              const next = new Set(prev);
+                              next.delete('constraints');
+                              return next;
+                            });
+                          }}
+                          className="w-32"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="w-24">Sample Time:</Label>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={spec.constraints.sample_time}
+                          onChange={(e) => {
+                            setSpec(prev => ({
+                              ...prev,
+                              constraints: { ...prev.constraints, sample_time: parseFloat(e.target.value) }
+                            }));
+                            setAssumedValues(prev => {
+                              const next = new Set(prev);
+                              next.delete('constraints');
+                              return next;
+                            });
+                          }}
+                          className="w-32"
+                        />
+                      </div>
+                    </div>
                   </div>
                   
-                  {spec.dataSource && (
-                    <div>
-                      <h3 className="font-medium text-sm text-muted-foreground mb-1">Data Source</h3>
-                      <p className="text-sm break-all">{spec.dataSource}</p>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-medium text-sm text-muted-foreground">Simulation Type</h3>
+                      {assumedValues.has('simulation') && (
+                        <Badge variant="secondary">Assumed</Badge>
+                      )}
                     </div>
-                  )}
+                    <Select
+                      value={spec.simulation}
+                      onValueChange={(value) => {
+                        setSpec(prev => ({ ...prev, simulation: value }));
+                        setAssumedValues(prev => {
+                          const next = new Set(prev);
+                          next.delete('simulation');
+                          return next;
+                        });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select simulation type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="real-time 3D">Real-time 3D</SelectItem>
+                        <SelectItem value="real-time 2D">Real-time 2D</SelectItem>
+                        <SelectItem value="offline 3D">Offline 3D</SelectItem>
+                        <SelectItem value="offline 2D">Offline 2D</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-medium text-sm text-muted-foreground">Data Source</h3>
+                      {assumedValues.has('dataSource') && (
+                        <Badge variant="secondary">Assumed</Badge>
+                      )}
+                    </div>
+                    <Textarea
+                      value={spec.dataSource}
+                      onChange={(e) => {
+                        setSpec(prev => ({ ...prev, dataSource: e.target.value }));
+                        setAssumedValues(prev => {
+                          const next = new Set(prev);
+                          next.delete('dataSource');
+                          return next;
+                        });
+                      }}
+                      placeholder="Enter data source or API endpoint information..."
+                      className="min-h-24"
+                    />
+                  </div>
                 </div>
                 
                 {/* Right: Visualization Preview */}
-                <div>
-                  <h3 className="font-medium text-sm text-muted-foreground mb-2">Visualization Preview</h3>
-                  <div className="aspect-video bg-secondary/20 rounded-lg border border-border flex items-center justify-center">
+                <div className="bg-card rounded-lg border border-border p-4 h-[400px] overflow-y-auto">
+                  <h3 className="font-medium mb-4">Visualization Preview</h3>
+                  <div className="aspect-video bg-secondary/20 rounded-lg border border-border flex items-center justify-center h-full">
                     <div className="text-center">
                       <div className="text-4xl mb-2">
                         {spec.simulation === 'real-time 3D' ? '3D' : '2D'}
@@ -404,7 +412,7 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
               <div className="pt-6 flex justify-between">
                 <Button 
                   variant="outline"
-                  onClick={() => setActiveTab('clarify')}
+                  onClick={() => setActiveTab('description')}
                 >
                   Back
                 </Button>
