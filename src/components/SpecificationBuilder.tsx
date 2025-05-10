@@ -21,8 +21,6 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
   const [error, setError] = useState<string | null>(null);
   const [spec, setSpec] = useState(DEFAULT_SPEC);
   const [assumedValues, setAssumedValues] = useState<Set<string>>(new Set());
-  const [dataSourceText, setDataSourceText] = useState('');
-  const [outputStructureText, setOutputStructureText] = useState('');
   // When task description is submitted, generate specification and switch to summary tab
   const handleTaskSubmit = async () => {
     if (!taskDescription.trim()) return;
@@ -119,7 +117,7 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
             
             {/* Specification Summary Tab */}
             <TabsContent value="summary" className="mt-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 {/* Left: Specification Details */}
                 <div className="space-y-6">
                   <div>
@@ -191,13 +189,23 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                         variant="outline"
                         size="sm"
                         onClick={() => {
+                          const newControl = 'new_control';
                           setSpec(prev => ({
                             ...prev,
-                            controls: [...prev.controls, 'new_control']
+                            controls: [...prev.controls, newControl],
+                            controlRanges: {
+                              ...prev.controlRanges,
+                              [newControl]: {
+                                min: 0,
+                                max: 100,
+                                unit: 'percent'
+                              }
+                            }
                           }));
                           setAssumedValues(prev => {
                             const next = new Set(prev);
                             next.delete('controls');
+                            next.delete('controlRanges');
                             return next;
                           });
                         }}
@@ -223,14 +231,14 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                               <Label className="text-xs">Min</Label>
                               <Input
                                 type="number"
-                                value={spec.controlRanges[control].min}
+                                value={spec.controlRanges?.[control]?.min ?? 0}
                                 onChange={(e) => {
                                   setSpec(prev => ({
                                     ...prev,
                                     controlRanges: {
                                       ...prev.controlRanges,
                                       [control]: {
-                                        ...prev.controlRanges[control],
+                                        ...(prev.controlRanges?.[control] ?? {}),
                                         min: parseFloat(e.target.value)
                                       }
                                     }
@@ -247,14 +255,14 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                               <Label className="text-xs">Max</Label>
                               <Input
                                 type="number"
-                                value={spec.controlRanges[control].max}
+                                value={spec.controlRanges?.[control]?.max ?? 100}
                                 onChange={(e) => {
                                   setSpec(prev => ({
                                     ...prev,
                                     controlRanges: {
                                       ...prev.controlRanges,
                                       [control]: {
-                                        ...prev.controlRanges[control],
+                                        ...(prev.controlRanges?.[control] ?? {}),
                                         max: parseFloat(e.target.value)
                                       }
                                     }
@@ -270,14 +278,14 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                             <div>
                               <Label className="text-xs">Unit</Label>
                               <Input
-                                value={spec.controlRanges[control].unit}
+                                value={spec.controlRanges?.[control]?.unit ?? 'percent'}
                                 onChange={(e) => {
                                   setSpec(prev => ({
                                     ...prev,
                                     controlRanges: {
                                       ...prev.controlRanges,
                                       [control]: {
-                                        ...prev.controlRanges[control],
+                                        ...(prev.controlRanges?.[control] ?? {}),
                                         unit: e.target.value
                                       }
                                     }
@@ -433,32 +441,6 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                   </div>
                   
                   
-                </div>
-                
-                {/* Right: Additional Settings */}
-                <div className="bg-card rounded-lg border border-border p-4 h-[400px] overflow-y-auto">
-                  <h3 className="font-medium mb-4">Additional Configuration</h3>
-                  
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Data Source</Label>
-                      <Textarea 
-                        placeholder="Paste documentation about your data source or API here..."
-                        value={dataSourceText}
-                        onChange={(e) => setDataSourceText(e.target.value)}
-                        className="min-h-24"
-                      />
-
-                      <Label>Output Structure</Label>
-                      <Textarea 
-                        placeholder="Paste documentation about your data source or API here..."
-                        value={outputStructureText}
-                        onChange={(e) => setOutputStructureText(e.target.value)}
-                        className="min-h-24"
-                      />
-                      
-                    </div>
-                  </div>
                 </div>
               </div>
               

@@ -137,13 +137,6 @@ const ControllerSetup = ({ spec, onLaunch }: ControllerSetupProps) => {
                   <div className="font-medium">Wind Gust:</div>
                   <div>{spec.constraints.wind_gust}</div>
                   
-                  {spec.dataSource && (
-                    <>
-                      <div className="font-medium">Data Source:</div>
-                      <div className="truncate">{spec.dataSource}</div>
-                    </>
-                  )}
-                  
                   <div className="font-medium">Visualization:</div>
                   <div>{spec.simulation}</div>
                 </div>

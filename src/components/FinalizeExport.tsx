@@ -64,7 +64,7 @@ class DroneController:
         self.prev_error = np.zeros(3)  # Previous error for derivative
         self.integral = np.zeros(3)    # Integral accumulator
         
-        self.sample_time = 0.02  # 50 Hz control loop
+        self.sample_time = 0.1  # 10 Hz control loop
         self.max_integral = 10.0  # Anti-windup limit
     
     def update(self, setpoint, current_position):
@@ -129,7 +129,7 @@ class DroneController:
         self.P = linalg.solve_continuous_are(self.A, self.B, self.Q, self.R)
         self.K = np.linalg.inv(self.R) @ self.B.T @ self.P
         
-        self.sample_time = 0.02  # 50 Hz control loop
+        self.sample_time = 0.1  # 10 Hz control loop
     
     def update(self, setpoint, current_state):
         # Calculate error state
