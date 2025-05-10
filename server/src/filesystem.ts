@@ -37,10 +37,22 @@ export const ensureExperimentsDir = () => {
   return experimentsPath
 }
 
+// Ensure experiment directory exists
+export const ensureExperimentDir = (experimentId: string) => {
+  const experimentsPath = ensureExperimentsDir()
+  const experimentPath = join(experimentsPath, experimentId)
+  try {
+    fs.accessSync(experimentPath)
+  } catch {
+    fs.mkdirSync(experimentPath, { recursive: true })
+  }
+  return experimentPath
+}
+
 // Save experiment data
 export const saveExperiment = async (experimentId: string, data: any) => {
-  const experimentsPath = await ensureExperimentsDir()
-  const filePath = join(experimentsPath, `${experimentId}.json`)
+  const experimentPath = ensureExperimentDir(experimentId)
+  const filePath = join(experimentPath, 'experiment.json')
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2))
   return filePath
 }
@@ -48,7 +60,7 @@ export const saveExperiment = async (experimentId: string, data: any) => {
 // Load experiment data
 export const loadExperiment = async (experimentId: string) => {
   const experimentsPath = getExperimentsPath()
-  const filePath = join(experimentsPath, `${experimentId}.json`)
+  const filePath = join(experimentsPath, experimentId, 'experiment.json')
   try {
     const data = fs.readFileSync(filePath, 'utf-8')
     return JSON.parse(data)
