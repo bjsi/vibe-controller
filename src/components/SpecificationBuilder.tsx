@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { X } from "lucide-react";
+import { initializeConversation, sendMessage, generateSpecification, type ConversationState } from '@/lib/gemini';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -24,8 +24,10 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [dataSourceText, setDataSourceText] = useState('');
+  const [responseStructureText, setResponseStructureText] = useState('');
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [pastedImage, setPastedImage] = useState<string | null>(null);
+  const [conversationState, setConversationState] = useState<ConversationState | null>(null);
   
   // Spec state
   const [spec, setSpec] = useState({
@@ -43,84 +45,79 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
     dataSource: ''
   });
 
-  // When task description is submitted, switch to clarify tab
-  const handleTaskSubmit = () => {
+  // When task description is submitted, switch to clarify tab and initialize conversation
+  const handleTaskSubmit = async () => {
     if (!taskDescription.trim()) return;
     
     setActiveTab('clarify');
-    // Simulate initial assistant message
-    simulateAssistantMessage(
-      `I'll help you create a controller based on your description: "${taskDescription}". Let me ask a few questions to clarify the requirements.\n\nFirst, could you confirm if you're working with a quadcopter drone or another type of aerial vehicle?`
-    );
-  };
-
-  const simulateAssistantMessage = (content: string) => {
     setIsLoading(true);
     
-    // Simulate typing delay
-    setTimeout(() => {
-      setMessages(prev => [...prev, { role: 'assistant', content }]);
+    try {
+      // Initialize conversation with Gemini
+      const initialState = initializeConversation(taskDescription);
+      setConversationState(initialState);
+      
+      // Get initial response
+      const updatedState = await sendMessage(initialState, taskDescription);
+      setConversationState(updatedState);
+      
+      // Update UI messages
+      setMessages([
+        { role: 'assistant', content: updatedState.messages[updatedState.messages.length - 1].parts[0].text }
+      ]);
+      
+      // Update spec if provided
+      if (updatedState.spec) {
+        setSpec(updatedState.spec);
+      }
+    } catch (error) {
+      console.error('Error initializing conversation:', error);
+      setMessages([
+        { role: 'assistant', content: 'I apologize, but I encountered an error. Please try again.' }
+      ]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
-  const handleSendMessage = () => {
-    if (!userInput.trim()) return;
+  const handleSendMessage = async () => {
+    if (!userInput.trim() || !conversationState) return;
     
-    // Add user message
+    // Add user message to UI
     const newMessage: Message = { role: 'user', content: userInput };
     setMessages(prev => [...prev, newMessage]);
     setUserInput('');
-    
-    // Simulate assistant response based on user input
     setIsLoading(true);
     
-    setTimeout(() => {
-      let response = '';
+    try {
+      // Send message to Gemini
+      const updatedState = await sendMessage(conversationState, userInput);
+      setConversationState(updatedState);
       
-      // Simple response logic based on keywords
-      if (userInput.toLowerCase().includes('quadcopter') || userInput.toLowerCase().includes('yes')) {
-        response = "Great! For a quadcopter, I'll need to know about your desired performance specifications. How quickly should the drone respond to position commands? Would you prefer a controller that prioritizes stability or agility?";
-        
-        // Update spec based on response
-        setSpec(prev => ({
-          ...prev,
-          plant: 'quadcopter3D'
-        }));
-      }
-      else if (userInput.toLowerCase().includes('data') || userInput.toLowerCase().includes('dataset')) {
-        response = "Do you have flight data from the drone that we could use for system identification? This would help create a more accurate model of your specific drone.";
-      }
-      else if (userInput.toLowerCase().includes('api') || userInput.toLowerCase().includes('endpoint')) {
-        response = "Thanks for mentioning the API. Could you provide more details about the endpoint structure and what kind of data it returns?";
-        
-        // Update spec with the API endpoint if provided
-        if (dataSourceText) {
-          setSpec(prev => ({
-            ...prev,
-            dataSource: dataSourceText
-          }));
-        }
-      }
-      else if (userInput.toLowerCase().includes('wind') || userInput.toLowerCase().includes('disturbance')) {
-        response = "I've noted the wind disturbance requirements. What other environmental factors should the controller be robust against?";
-        
-        // Update spec constraints
-        setSpec(prev => ({
-          ...prev,
-          constraints: {
-            ...prev.constraints,
-            wind_gust: '±3m/s'  // Updated based on the conversation
-          }
-        }));
-      }
-      else {
-        response = "Thanks for the information. Based on your requirements, I'm configuring a control system for your drone. Would you like to specify any other constraints or performance metrics for the controller?";
+      // Update UI messages
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: updatedState.messages[updatedState.messages.length - 1].parts[0].text }
+      ]);
+      
+      // Update spec if provided
+      if (updatedState.spec) {
+        setSpec(updatedState.spec);
       }
       
-      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+      // If all questions are answered, move to summary tab
+      if (updatedState.questionsAnswered) {
+        setActiveTab('summary');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: 'I apologize, but I encountered an error. Please try again.' }
+      ]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -196,11 +193,10 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                   id="description"
                   className="min-h-32 text-base"
                   placeholder="For example: Design a drone controller that can hover steadily at 5 meters height even in the presence of wind gusts."
-                  value={taskDescription}
+                  value={taskDescription || "Design a drone controller that can hover steadily at 5 meters height even in the presence of wind gusts."}
                   onChange={(e) => setTaskDescription(e.target.value)}
                 />
               </div>
-              
               <div className="pt-4 flex justify-end">
                 <Button 
                   onClick={handleTaskSubmit}
@@ -313,41 +309,23 @@ const SpecificationBuilder = ({ onConfirm }: SpecificationBuilderProps) => {
                     <div className="space-y-2">
                       <Label>Data Source</Label>
                       <Textarea 
-                        placeholder="Paste documentation about your data source or API here..."
+                        placeholder="Paste documentation and request examples about your data source or API here..."
                         value={dataSourceText}
                         onChange={(e) => setDataSourceText(e.target.value)}
                         className="min-h-24"
                       />
-                      <div className="flex items-center space-x-2 mt-2">
-                        <span className="text-xs text-muted-foreground">
-                          Or upload a data file:
-                        </span>
-                        <input 
-                          type="file" 
-                          onChange={handleFileChange} 
-                          className="text-xs text-muted-foreground"
-                        />
-                      </div>
                     </div>
-                    
+                  </div>
+
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Simulation Type</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button 
-                          variant={spec.simulation === 'real-time 3D' ? 'default' : 'outline'}
-                          onClick={() => setSpec({...spec, simulation: 'real-time 3D'})}
-                          className="justify-start"
-                        >
-                          Real-time 3D
-                        </Button>
-                        <Button 
-                          variant={spec.simulation === '2D plots' ? 'default' : 'outline'}
-                          onClick={() => setSpec({...spec, simulation: '2D plots'})}
-                          className="justify-start"
-                        >
-                          2D Plots
-                        </Button>
-                      </div>
+                      <Label>Sample Response Structure</Label>
+                      <Textarea 
+                        placeholder="Paste a sample response from the API here..."
+                        value={responseStructureText}
+                        onChange={(e) => setResponseStructureText(e.target.value)}
+                        className="min-h-24"
+                      />
                     </div>
                   </div>
                 </div>
