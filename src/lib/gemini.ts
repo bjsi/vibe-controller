@@ -29,6 +29,19 @@ export interface ConversationState {
   questionsAnswered: boolean;
 }
 
+// Interface for controller recommendations
+export interface ControllerRecommendation {
+  id: string;
+  name: string;
+  description: string;
+  successProbability: number;
+  timeEstimate: string;
+  requiresGPU: boolean;
+  parameters?: {
+    [key: string]: any;
+  };
+}
+
 // Default specification structure
 export const DEFAULT_SPEC = {
   plant: 'drone3D',
@@ -298,6 +311,114 @@ For any values not explicitly specified in the task description, use reasonable 
     }
   } catch (error) {
     console.error('Error in generateSpecification:', error);
+    throw error;
+  }
+};
+
+// Analyze specification and recommend controllers
+export const analyzeSpecification = async (spec: any): Promise<ControllerRecommendation[]> => {
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    
+    const prompt = `Analyze the following control system specification and recommend appropriate controllers.
+For each controller, provide:
+1. A detailed description of why it's suitable
+2. Success probability based on the specification
+3. Estimated computation time
+4. Whether it requires GPU
+5. Initial parameters if applicable
+
+Specification:
+${JSON.stringify(spec, null, 2)}
+
+Consider:
+- System type (${spec.plant})
+- Control objectives (${JSON.stringify(spec.objective)})
+- Environmental constraints (${JSON.stringify(spec.constraints)})
+- Control inputs and ranges (${JSON.stringify(spec.controlRanges)})
+- Sample time (${spec.constraints.sample_time}s)
+
+Return the recommendations as a JSON array of controller objects in the following format:
+\`\`\`json
+[
+  {
+    "id": "controller-id",
+    "name": "Controller Name",
+    "description": "Detailed description",
+    "successProbability": 0.85,
+    "timeEstimate": "5-10 minutes",
+    "requiresGPU": false,
+    "parameters": {
+      // Optional controller-specific parameters
+    }
+  }
+]
+\`\`\`
+
+Keep the response concise but informative.`;
+
+    console.log('Sending prompt to Gemini:', prompt);
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 2048, // Increased token limit
+      },
+    });
+
+    const response = result.response;
+    const responseText = response.text();
+    
+    console.log('Raw response from Gemini:', responseText);
+
+    // Extract JSON from response
+    const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/);
+    if (jsonMatch) {
+      console.log('Found JSON match:', jsonMatch[1]);
+      try {
+        // Try to parse the JSON, even if it's incomplete
+        const recommendations = JSON.parse(jsonMatch[1]);
+        console.log('Parsed recommendations:', recommendations);
+        
+        // Validate recommendations structure
+        if (!Array.isArray(recommendations)) {
+          console.error('Recommendations is not an array:', recommendations);
+          throw new Error('Invalid recommendations format: expected array');
+        }
+        
+        // Validate each recommendation
+        const validRecommendations = recommendations.filter((rec, index) => {
+          const isValid = rec.id && rec.name && rec.description && 
+                         typeof rec.successProbability === 'number' && 
+                         rec.timeEstimate && 
+                         typeof rec.requiresGPU === 'boolean';
+          
+          if (!isValid) {
+            console.warn(`Skipping invalid recommendation at index ${index}:`, rec);
+          }
+          
+          return isValid;
+        });
+        
+        if (validRecommendations.length === 0) {
+          throw new Error('No valid recommendations found after filtering');
+        }
+        
+        return validRecommendations;
+      } catch (e) {
+        console.error('Failed to parse controller recommendations:', e);
+        console.error('JSON content that failed to parse:', jsonMatch[1]);
+        throw new Error('Failed to parse controller recommendations');
+      }
+    }
+
+    console.error('No JSON block found in response. Full response:', responseText);
+    throw new Error('No valid controller recommendations found in response');
+  } catch (error) {
+    console.error('Error in analyzeSpecification:', error);
     throw error;
   }
 }; 
