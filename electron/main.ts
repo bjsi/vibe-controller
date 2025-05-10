@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
+import { saveExperiment } from './filesystem'
+import { v4 as uuidv4 } from 'uuid'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -45,18 +47,19 @@ function createWindow() {
 }
 
 // Handle IPC messages
-ipcMain.on('start-experiment', (event, controllers) => {
+ipcMain.on('start-experiment', async (event, controllers) => {
   log('----------------------------------------')
   log('🚀 Start Experiment Message Received!')
   log(`Controllers: ${controllers}`)
   log(`Sender: ${event.sender.getTitle()}`)
   log('----------------------------------------')
-  // TODO: Implement actual experiment logic
+
 })
 
 app.whenReady().then(() => {
   log('App is ready, creating window...')
   createWindow()
+  setupAgent() // Set up the agent handlers
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

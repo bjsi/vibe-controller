@@ -39,13 +39,12 @@ function createWindow() {
     });
 }
 // Handle IPC messages
-ipcMain.on('start-experiment', (event, controllers) => {
+ipcMain.on('start-experiment', async (event, controllers) => {
     log('----------------------------------------');
     log('🚀 Start Experiment Message Received!');
     log(`Controllers: ${controllers}`);
     log(`Sender: ${event.sender.getTitle()}`);
     log('----------------------------------------');
-    // TODO: Implement actual experiment logic
 });
 app.whenReady().then(() => {
     log('App is ready, creating window...');
