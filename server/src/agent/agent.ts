@@ -31,6 +31,10 @@ interface AgentMessage {
   };
 }
 
+const generalInstructions = `
+Please use Python.
+Implement your solution in a single file called main.py.`
+
 export async function startAgent(options: AgentOptions): Promise<void> {
   const { instructions, directory, id } = options;
   const absDir = path.resolve(process.cwd(), directory);
@@ -69,7 +73,7 @@ export async function startAgent(options: AgentOptions): Promise<void> {
   const claudeProc = spawn(
     claudePath,
     [
-      '-p', instructions,
+      '-p', instructions + ' ' + generalInstructions,
       '--output-format', 'stream-json',
       '--verbose',
       '--dangerously-skip-permissions'
