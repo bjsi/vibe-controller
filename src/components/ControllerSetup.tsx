@@ -87,7 +87,7 @@ const ControllerSetup = ({ spec, onLaunch }: ControllerSetupProps) => {
 
       if (response.status === 'success' && response.data) {
         onLaunch({
-          experimentId: response.data.id,
+          id: response.data.id,
           instructions: response.data.instructions,
           status: response.data.status,
           startTime: response.data.startTime,

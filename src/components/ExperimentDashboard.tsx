@@ -52,6 +52,7 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
   const [agentState, setAgentState] = useState<ExperimentState>({ status: 'running', log: [] });
   const [polling, setPolling] = useState(true);
 
+  console.log("config", config);
   useEffect(() => {
     if (!config) {
       setIsLoading(true);
@@ -62,9 +63,11 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
           timestamp: new Date().toISOString()
         }
       ]);
+      console.log('[ExperimentDashboard] No config provided, waiting...');
       return;
     }
 
+    console.log('[ExperimentDashboard] Received config:', config);
     setIsLoading(false);
     const initialControllers = [];
     if (config.selectedControllers?.pid) {
@@ -116,32 +119,29 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
         });
       });
     }, 3000);
-
-    const overallSimulationTimeout = setTimeout(() => {
-      setSimulationRunning(false);
-      setCliMessages(prevMessages => [
-        ...prevMessages,
-        {
-          type: 'assistant',
-          content: 'Experiment run concluded by dashboard timer. Check agent state for final status.',
-          timestamp: new Date().toISOString()
-        } as CLIMessage
-      ].slice(-20));
-    }, 30000);
-
+    
     return () => {
       clearInterval(controllerUpdateInterval);
-      clearTimeout(overallSimulationTimeout);
     };
   }, [config]);
 
   useEffect(() => {
-    if (!config?.id) {
+    if (!config?.id || !polling) {
+      console.log('[ExperimentDashboard] fetchAgentState not running because:', {
+        'config?.id': config?.id,
+        polling,
+        'condition': !config?.id || !polling
+      });
       return;
     }
 
     const experimentId = config.id;
     let isMounted = true;
+
+    console.log('[ExperimentDashboard] Starting fetchAgentState effect with:', {
+      experimentId,
+      polling
+    });
 
     const fetchAgentState = async () => {
       try {
@@ -172,36 +172,76 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
         
         console.log('[ExperimentDashboard] Received state data:', stateData);
         
-        if (stateData.status === 'completed' || stateData.status === 'error') {
-          setPolling(false);
+        if (isMounted) {
+          if (stateData.status === 'completed' || stateData.status === 'error') {
+            setPolling(false);
+          }
+          setAgentState(stateData);
+
+          // Log current state of messages
+          console.log('[ExperimentDashboard] Current CLI messages:', cliMessages);
+          console.log('[ExperimentDashboard] State data messages/log:', {
+            messages: stateData.messages,
+            log: stateData.log
+          });
+
+          // Update to handle both messages and log arrays
+          const newMessages = [
+            ...(stateData.messages || []).map((msg: any) => ({
+              type: 'assistant',
+              content: msg.content,
+              timestamp: msg.timestamp,
+              status: msg.type
+            })),
+            ...(stateData.log || []).map((msg: any) => ({
+              type: msg.type,
+              content: msg.content,
+              timestamp: msg.timestamp,
+              status: msg.type === 'error' ? 'error' : 'info'
+            }))
+          ];
+
+          if (newMessages.length > 0) {
+            console.log('[ExperimentDashboard] Setting new messages:', newMessages);
+            setCliMessages(newMessages.slice(-20));
+          }
         }
-        
-        setAgentState(stateData);
+
       } catch (error) {
         console.error('[ExperimentDashboard] Failed to fetch or process agent state:', error);
-        setAgentState(prev => ({
-          ...prev,
-          log: [
-            ...prev.log,
+        if (isMounted) {
+          setAgentState(prev => ({
+            ...prev,
+            log: [
+              ...prev.log,
+              {
+                type: 'assistant',
+                content: `Error fetching state: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date().toISOString(),
+              }
+            ]
+          }));
+          setCliMessages(prevMessages => [
+            ...prevMessages,
             {
-              type: 'assistant',
+              type: 'assistant' as 'assistant',
               content: `Error fetching state: ${error instanceof Error ? error.message : 'Unknown error'}`,
               timestamp: new Date().toISOString(),
-              status: 'error'
+              status: 'error' as 'error'
             }
-          ]
-        }));
+          ].slice(-20));
+        }
       }
     };
 
-    if (simulationRunning) {
-      fetchAgentState();
-    }
+    fetchAgentState();
+    const intervalId = setInterval(fetchAgentState, 3000);
 
     return () => {
       isMounted = false;
+      clearInterval(intervalId);
     };
-  }, [config?.id, simulationRunning]);
+  }, [config?.id, polling]);
 
   const handleSelectController = (controller: Controller) => {
     setControllers(prev => 

@@ -16,9 +16,12 @@ interface AgentState {
 class AgentStateManager {
   private static instance: AgentStateManager;
   private states: Map<string, AgentState>;
+  private instanceId: string; // Unique ID for the instance
 
   private constructor() {
     this.states = new Map();
+    this.instanceId = Math.random().toString(36).substring(2, 9);
+    console.log(`[AgentStateManager] New instance created with ID: ${this.instanceId}`);
   }
 
   static getInstance(): AgentStateManager {
@@ -29,6 +32,7 @@ class AgentStateManager {
   }
 
   createState(id: string): AgentState {
+    console.log(`[AgentStateManager instance ${this.instanceId}] createState called for id: ${id}`);
     const state: AgentState = {
       id,
       status: 'pending',
@@ -41,9 +45,10 @@ class AgentStateManager {
   }
 
   addMessage(id: string, content: string, type: AgentMessage['type'] = 'info'): AgentState | null {
+    console.log(`[AgentStateManager instance ${this.instanceId}] addMessage called for id: ${id}, type: ${type}`);
     const state = this.states.get(id);
     if (!state) {
-      console.warn(`[AgentStateManager] No state found for id: ${id}`);
+      console.warn(`[AgentStateManager instance ${this.instanceId}] No state found for id: ${id} in addMessage`);
       return null;
     }
 
@@ -72,9 +77,10 @@ class AgentStateManager {
   }
 
   updateState(id: string, update: Partial<Omit<AgentState, 'messages'>>): AgentState | null {
+    console.log(`[AgentStateManager instance ${this.instanceId}] updateState called for id: ${id}`);
     const state = this.states.get(id);
     if (!state) {
-      console.warn(`[AgentStateManager] No state found for id: ${id}`);
+      console.warn(`[AgentStateManager instance ${this.instanceId}] No state found for id: ${id} in updateState`);
       return null;
     }
 
@@ -88,14 +94,21 @@ class AgentStateManager {
   }
 
   getState(id: string): AgentState | null {
-    return this.states.get(id) || null;
+    console.log(`[AgentStateManager instance ${this.instanceId}] getState called for id: ${id}`);
+    const stateResult = this.states.get(id) || null;
+    if (!stateResult) {
+        console.warn(`[AgentStateManager instance ${this.instanceId}] No state found for id: ${id} in getState`);
+    }
+    return stateResult;
   }
 
   deleteState(id: string): boolean {
+    console.log(`[AgentStateManager instance ${this.instanceId}] deleteState called for id: ${id}`);
     return this.states.delete(id);
   }
 
   getAllStates(): AgentState[] {
+    console.log(`[AgentStateManager instance ${this.instanceId}] getAllStates called`);
     return Array.from(this.states.values());
   }
 }
