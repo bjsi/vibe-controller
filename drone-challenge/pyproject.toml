@@ -22,12 +22,12 @@ keywords = []
 [tool.poetry.dependencies]
 python = "^3.8"
 protobuf = "^4.25.0"
-grpcio = "^1.59.2"
+grpcio = "1.59.2"
 grpcio-tools = "^1.59.2"
 python-dotenv = "^1.0.0"
 simple-pid = "^2.0.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 black = "*"
 flake8 = "*"
 isort = "*"

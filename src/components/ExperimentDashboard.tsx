@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Controller {
   id: string;
@@ -14,6 +15,13 @@ interface Controller {
     energy: number;
   };
   selected: boolean;
+}
+
+interface Experiment {
+  id: string;
+  status: string;
+  startTime: string;
+  instructions: string;
 }
 
 interface CLIMessage {
@@ -32,6 +40,7 @@ interface ExperimentDashboardProps {
     };
   } | null;
   onSelectBest: (controller: Controller) => void;
+  onRunExperiment?: (experimentId: string) => void;
 }
 
 interface ExperimentState {
@@ -43,14 +52,15 @@ interface ExperimentState {
   }>;
 }
 
-const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps) => {
+const ExperimentDashboard = ({ config, onSelectBest, onRunExperiment }: ExperimentDashboardProps) => {
   const [controllers, setControllers] = useState<Controller[]>([]);
   const [cliMessages, setCliMessages] = useState<CLIMessage[]>([]);
   const [selectedController, setSelectedController] = useState<Controller | null>(null);
-  const [simulationRunning, setSimulationRunning] = useState(true);
+  const [simulationRunning, setSimulationRunning] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [agentState, setAgentState] = useState<ExperimentState>({ status: 'running', log: [] });
-  const [polling, setPolling] = useState(true);
+  const [experiments, setExperiments] = useState<Experiment[]>([]);
+  const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null);
+  const [activeTab, setActiveTab] = useState<'log' | 'experiments'>('experiments');
 
   console.log("config", config);
   useEffect(() => {
@@ -125,138 +135,133 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
     };
   }, [config]);
 
+  // Load experiments on mount
   useEffect(() => {
-    if (!config?.id || !polling) {
-      console.log('[ExperimentDashboard] fetchAgentState not running because:', {
-        'config?.id': config?.id,
-        polling,
-        'condition': !config?.id || !polling
-      });
-      return;
-    }
-
-    const experimentId = config.id;
-    let isMounted = true;
-
-    console.log('[ExperimentDashboard] Starting fetchAgentState effect with:', {
-      experimentId,
-      polling
-    });
-
-    const fetchAgentState = async () => {
+    const fetchExperiments = async () => {
       try {
-        console.log('[ExperimentDashboard] Fetching state for experiment', experimentId);
-        const response = await fetch(`http://localhost:3000/api/get_experiment_state?id=${experimentId}`, {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        });
-        console.log('[ExperimentDashboard] Response status:', response.status);
-        console.log('[ExperimentDashboard] Response headers:', Object.fromEntries(response.headers.entries()));
+        const response = await fetch('http://localhost:3000/api/list_experiments');
+        if (!response.ok) throw new Error('Failed to fetch experiments');
         
-        const responseText = await response.text();
-        console.log('[ExperimentDashboard] Raw response:', responseText.substring(0, 200) + '...');
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}, body: ${responseText}`);
+        const data = await response.json();
+        if (data.status === 'success') {
+          setExperiments(data.data);
+          setIsLoading(false);
         }
-        
-        let stateData;
-        try {
-          stateData = JSON.parse(responseText);
-        } catch (e) {
-          console.error('[ExperimentDashboard] Failed to parse JSON:', e);
-          throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}...`);
-        }
-        
-        console.log('[ExperimentDashboard] Received state data:', stateData);
-        
-        if (isMounted) {
-          if (stateData.status === 'completed' || stateData.status === 'error') {
-            setPolling(false);
-          }
-          setAgentState(stateData);
-
-          // Log current state of messages
-          console.log('[ExperimentDashboard] Current CLI messages:', cliMessages);
-          console.log('[ExperimentDashboard] State data messages/log:', {
-            messages: stateData.messages,
-            log: stateData.log
-          });
-
-          // Update to handle both messages and log arrays
-          const newMessages = [
-            ...(stateData.messages || []).map((msg: any) => ({
-              type: 'assistant',
-              content: msg.content,
-              timestamp: msg.timestamp,
-              status: msg.type
-            })),
-            ...(stateData.log || []).map((msg: any) => ({
-              type: msg.type,
-              content: msg.content,
-              timestamp: msg.timestamp,
-              status: msg.type === 'error' ? 'error' : 'info'
-            }))
-          ];
-
-          if (newMessages.length > 0) {
-            console.log('[ExperimentDashboard] Setting new messages:', newMessages);
-            setCliMessages(newMessages.slice(-20));
-          }
-        }
-
       } catch (error) {
-        console.error('[ExperimentDashboard] Failed to fetch or process agent state:', error);
-        if (isMounted) {
-          setAgentState(prev => ({
-            ...prev,
-            log: [
-              ...prev.log,
-              {
-                type: 'assistant',
-                content: `Error fetching state: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                timestamp: new Date().toISOString(),
-              }
-            ]
-          }));
-          setCliMessages(prevMessages => [
-            ...prevMessages,
-            {
-              type: 'assistant' as 'assistant',
-              content: `Error fetching state: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              timestamp: new Date().toISOString(),
-              status: 'error' as 'error'
-            }
-          ].slice(-20));
-        }
+        console.error('Error fetching experiments:', error);
+        setCliMessages(prev => [
+          ...prev,
+          {
+            type: 'assistant' as const,
+            content: `Error fetching experiments: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            timestamp: new Date().toISOString(),
+            status: 'error' as const
+          }
+        ].slice(-20));
+        setIsLoading(false);
       }
     };
 
-    fetchAgentState();
-    const intervalId = setInterval(fetchAgentState, 3000);
+    fetchExperiments();
+    const intervalId = setInterval(fetchExperiments, 5000);
+    return () => clearInterval(intervalId);
+  }, []);
 
-    return () => {
-      isMounted = false;
-      clearInterval(intervalId);
-    };
-  }, [config?.id, polling]);
-
-  const handleSelectController = (controller: Controller) => {
-    setControllers(prev => 
-      prev.map(c => ({
-        ...c,
-        selected: c.id === controller.id
-      }))
-    );
+  // Handle experiment selection
+  const handleSelectExperiment = (experiment: Experiment) => {
+    setSelectedExperiment(experiment);
+    setActiveTab('log');
     
-    setSelectedController(controller);
+    // Initialize controllers based on experiment
+    const initialControllers = [];
+    if (experiment.instructions.includes('PID')) {
+      initialControllers.push({
+        id: 'pid-1',
+        type: 'PID',
+        iteration: 1,
+        metrics: { riseTime: 1.2, overshoot: 12.5, steadyStateError: 0.08, energy: 18.2 },
+        selected: false
+      });
+    }
+    if (experiment.instructions.includes('LQR')) {
+      initialControllers.push({
+        id: 'lqr-1',
+        type: 'LQR',
+        iteration: 1,
+        metrics: { riseTime: 0.9, overshoot: 8.2, steadyStateError: 0.05, energy: 22.1 },
+        selected: false
+      });
+    }
+    setControllers(initialControllers);
+    
+    // Add initial message
+    setCliMessages([
+      {
+        type: 'assistant' as const,
+        content: `Selected experiment ${experiment.id}. Ready to execute drone.`,
+        timestamp: new Date().toISOString(),
+        status: 'info' as const
+      }
+    ]);
   };
-  
-  const handleFinalize = () => {
-    if (selectedController) {
-      onSelectBest(selectedController);
+
+  const executeDrone = async () => {
+    if (!selectedExperiment?.id) {
+      setCliMessages(prev => [
+        ...prev,
+        {
+          type: 'assistant' as const,
+          content: 'No experiment selected. Please select an experiment first.',
+          timestamp: new Date().toISOString(),
+          status: 'error' as const
+        }
+      ].slice(-20));
+      return;
+    }
+
+    try {
+      setSimulationRunning(true);
+      const response = await fetch('http://localhost:3000/api/execute_drone', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: selectedExperiment.id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to execute drone');
+      }
+
+      const data = await response.json();
+      if (data.status === 'success') {
+        setCliMessages(prev => [
+          ...prev,
+          {
+            type: 'assistant' as const,
+            content: 'Drone execution started successfully',
+            timestamp: new Date().toISOString(),
+            status: 'success' as const
+          }
+        ].slice(-20));
+      } else {
+        throw new Error(data.message || 'Failed to execute drone');
+      }
+    } catch (error) {
+      console.error('Error executing drone:', error);
+      setCliMessages(prev => [
+        ...prev,
+        {
+          type: 'assistant' as const,
+          content: `Error executing drone: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          timestamp: new Date().toISOString(),
+          status: 'error' as const
+        }
+      ].slice(-20));
+    } finally {
+      setSimulationRunning(false);
     }
   };
 
@@ -267,7 +272,7 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
           <CardContent className="flex items-center justify-center h-[500px]">
             <div className="flex flex-col items-center">
               <div className="h-10 w-10 border-t-2 border-primary rounded-full animate-spin-slow mb-3"></div>
-              <p className="text-lg">Loading experiment configuration...</p>
+              <p className="text-lg">Loading experiments...</p>
             </div>
           </CardContent>
         </Card>
@@ -284,98 +289,113 @@ const ExperimentDashboard = ({ config, onSelectBest }: ExperimentDashboardProps)
         </CardHeader>
         <CardContent>
           <div className="grid-background h-[500px] rounded-lg flex items-center justify-center relative">
-            <div className="absolute inset-0 flex items-center justify-center z-10">
-              {simulationRunning ? (
-                <div className="flex flex-col items-center">
-                  <div className="h-10 w-10 border-t-2 border-primary rounded-full animate-spin-slow mb-3"></div>
-                  <p className="text-sm">Simulation Running...</p>
-                </div>
-              ) : (
-                <p className="text-lg font-medium">Simulation Complete</p>
-              )}
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 h-full w-full p-4">
-              {controllers.map(controller => (
-                <div 
-                  key={controller.id}
-                  className={`bg-secondary/50 rounded-lg p-4 flex flex-col relative ${
-                    controller.selected ? 'ring-2 ring-primary' : ''
-                  }`}
-                  onClick={() => handleSelectController(controller)}
-                >
-                  <h3 className="font-medium mb-2">{controller.type} Controller #{controller.iteration}</h3>
-                  
-                  <div className="flex-grow relative">
-                    {/* Simplified visualization of drone trajectory */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-1 h-32 bg-secondary/80 relative">
-                        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-primary rounded-full" />
-                        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-accent rounded-full" />
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    <div className="text-muted-foreground">Rise Time:</div>
-                    <div className="text-right">{controller.metrics.riseTime.toFixed(2)}s</div>
-                    
-                    <div className="text-muted-foreground">Overshoot:</div>
-                    <div className="text-right">{controller.metrics.overshoot.toFixed(1)}%</div>
-                    
-                    <div className="text-muted-foreground">Error:</div>
-                    <div className="text-right">{controller.metrics.steadyStateError.toFixed(3)}m</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <iframe 
+              src="http://172.237.101.153:8080" 
+              className="w-full h-full border-0"
+              title="Drone Simulation"
+            />
           </div>
         </CardContent>
       </Card>
       
-      {/* Right: CLI Interface */}
+      {/* Right: CLI Interface and Experiments */}
       <Card className="flex flex-col">
         <CardHeader>
           <CardTitle>Experiment Log</CardTitle>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col">
-          <div className="bg-black text-green-400 font-mono text-sm p-4 rounded-md h-[500px] overflow-y-auto flex flex-col">
-            {cliMessages.map((message, index) => (
-              <div key={index} className="mb-2">
-                <div className="flex items-start gap-2">
-                  <span className="text-gray-400">
-                    {new Date(message.timestamp).toLocaleTimeString()}
-                  </span>
-                  <span className={`${
-                    message.status === 'error' ? 'text-red-400' :
-                    message.status === 'warning' ? 'text-yellow-400' :
-                    message.status === 'success' ? 'text-green-400' :
-                    'text-blue-400'
-                  }`}>
-                    {message.type === 'assistant' ? 'Claude:' : 'User:'}
-                  </span>
-                </div>
-                <div className={`ml-8 whitespace-pre-wrap ${
-                  message.status === 'error' ? 'text-red-400' :
-                  message.status === 'warning' ? 'text-yellow-400' :
-                  message.status === 'success' ? 'text-green-400' :
-                  'text-gray-300'
-                }`}>
-                  {message.content}
-                </div>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'log' | 'experiments')} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="log">Log</TabsTrigger>
+              <TabsTrigger value="experiments">Experiments</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="log" className="mt-4">
+              <div className="bg-black text-green-400 font-mono text-sm p-4 rounded-md h-[500px] overflow-y-auto flex flex-col">
+                {cliMessages.map((message, index) => (
+                  <div key={index} className="mb-2">
+                    <div className="flex items-start gap-2">
+                      <span className="text-gray-400">
+                        {new Date(message.timestamp).toLocaleTimeString()}
+                      </span>
+                      <span className={`${
+                        message.status === 'error' ? 'text-red-400' :
+                        message.status === 'warning' ? 'text-yellow-400' :
+                        message.status === 'success' ? 'text-green-400' :
+                        'text-blue-400'
+                      }`}>
+                        {message.type === 'assistant' ? 'Claude:' : 'User:'}
+                      </span>
+                    </div>
+                    <div className={`ml-8 whitespace-pre-wrap ${
+                      message.status === 'error' ? 'text-red-400' :
+                      message.status === 'warning' ? 'text-yellow-400' :
+                      message.status === 'success' ? 'text-green-400' :
+                      'text-gray-300'
+                    }`}>
+                      {message.content}
+                    </div>
+                  </div>
+                ))}
+                {simulationRunning && (
+                  <div className="animate-pulse text-green-400">_</div>
+                )}
               </div>
-            ))}
-            {simulationRunning && (
-              <div className="animate-pulse text-green-400">_</div>
-            )}
-          </div>
+            </TabsContent>
+            
+            <TabsContent value="experiments" className="mt-4">
+              <div className="space-y-4 max-h-[500px] overflow-y-auto">
+                {experiments.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    No experiments found
+                  </div>
+                ) : (
+                  experiments.map(experiment => (
+                    <Card key={experiment.id} className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-medium">Experiment {experiment.id}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(experiment.startTime).toLocaleString()}
+                          </p>
+                          <p className="text-sm mt-2 line-clamp-2">
+                            {experiment.instructions}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            experiment.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            experiment.status === 'error' ? 'bg-red-100 text-red-800' :
+                            experiment.status === 'running' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {experiment.status}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSelectExperiment(experiment)}
+                            disabled={experiment.status === 'running'}
+                          >
+                            Select
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
           
-          <div className="mt-4 flex justify-end">
+          <div className="mt-4 flex justify-between">
             <Button 
-              onClick={handleFinalize}
-              disabled={!selectedController || simulationRunning}
+              onClick={executeDrone}
+              variant="outline"
+              className="mr-2"
+              disabled={!selectedExperiment || simulationRunning}
             >
-              {simulationRunning ? 'Running...' : 'Select Best Controller'}
+              Execute Drone
             </Button>
           </div>
         </CardContent>

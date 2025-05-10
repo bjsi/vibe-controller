@@ -328,7 +328,9 @@ Return the recommendations as a JSON array of controller objects in the followin
 ]
 \`\`\`
 
-Keep the response concise but informative.`;
+Keep the response concise but informative.
+
+If you recommend a PID controller, make sure to recommend throttle, pitch, and roll as controls.`;
 
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],

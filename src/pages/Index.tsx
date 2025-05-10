@@ -4,13 +4,11 @@ import { StepIndicator } from "@/components/StepIndicator";
 import SpecificationBuilder from "@/components/SpecificationBuilder";
 import ControllerSetup from "@/components/ControllerSetup";
 import ExperimentDashboard from "@/components/ExperimentDashboard";
-import FinalizeExport from "@/components/FinalizeExport";
 
 const steps = [
   "Specification",
   "Controller Setup",
-  "Experiment",
-  "Finalize"
+  "Experiment"
 ];
 
 const Index = () => {
@@ -43,13 +41,28 @@ const Index = () => {
     setSelectedController(null);
     setCurrentStep(1);
   };
+
+  const handleStepClick = (step: number) => {
+    // Allow jumping to Experiment step (3) directly
+    // For other steps, require previous steps to be completed
+    if (step === 3 || 
+        step === 1 || 
+        (step === 2 && specConfig) || 
+        (step === 4 && selectedController)) {
+      setCurrentStep(step);
+    }
+  };
   
   return (
     <div className="min-h-screen bg-background">
       <Header />
       
       <main className="max-w-7xl mx-auto px-4 pt-24 pb-16">
-        <StepIndicator steps={steps} currentStep={currentStep} />
+        <StepIndicator 
+          steps={steps} 
+          currentStep={currentStep} 
+          onStepClick={handleStepClick}
+        />
         
         <div className="mt-8">
           {currentStep === 1 && (
@@ -69,13 +82,6 @@ const Index = () => {
             <ExperimentDashboard 
               config={controllerConfig}
               onSelectBest={handleSelectBest}
-            />
-          )}
-          
-          {currentStep === 4 && selectedController && (
-            <FinalizeExport 
-              controller={selectedController}
-              onNewExperiment={handleNewExperiment}
             />
           )}
         </div>

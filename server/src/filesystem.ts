@@ -69,3 +69,40 @@ export const loadExperiment = async (experimentId: string) => {
     return null
   }
 }
+
+export async function listExperiments(): Promise<Array<{
+  id: string;
+  status: string;
+  startTime: string;
+  instructions: string;
+}>> {
+  const experimentsDir = join(process.cwd(), 'experiments');
+  
+  if (!fs.existsSync(experimentsDir)) {
+    return [];
+  }
+
+  const experimentIds = fs.readdirSync(experimentsDir);
+  const experiments = [];
+
+  for (const id of experimentIds) {
+    const experimentPath = join(experimentsDir, id, 'experiment.json');
+    if (fs.existsSync(experimentPath)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(experimentPath, 'utf-8'));
+        experiments.push({
+          id,
+          status: data.status || 'unknown',
+          startTime: data.startTime || new Date().toISOString(),
+          instructions: data.instructions || ''
+        });
+      } catch (error) {
+        console.error(`Error reading experiment ${id}:`, error);
+      }
+    }
+  }
+
+  return experiments.sort((a, b) => 
+    new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+  );
+}

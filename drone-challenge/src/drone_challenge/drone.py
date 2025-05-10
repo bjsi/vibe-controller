@@ -96,6 +96,6 @@ class DroneClient:
 if __name__ == "__main__":
     host = "172.237.101.153"
     port = 10301
-    token = "leeroy.jenkins"
+    token = "blue.cardigan.1"
     dc = DroneClient(host, port, token)
     dc.start()

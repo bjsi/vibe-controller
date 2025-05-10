@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "drone-challenge"
+version = "0.1.0"
+description = "Drone challenge project with shared dependencies"
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+packages = [{ include = "drone_challenge", from = "drone-challenge/src" }]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.13"
+grpcio = { version = "^1.60.0", extras = ["binary"] }
+grpcio-tools = { version = "^1.60.0", extras = ["binary"] }
+protobuf = "^4.25.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0", "setuptools>=42", "wheel"]
+build-backend = "poetry.core.masonry.api" 

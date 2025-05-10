@@ -6,7 +6,7 @@ interface AgentMessage {
 
 interface AgentState {
   id: string;
-  status: 'running' | 'completed' | 'error' | 'pending';
+  status: 'running' | 'completed' | 'error' | 'pending' | 'ended';
   startTime: string;
   lastUpdate: string;
   error?: string;
