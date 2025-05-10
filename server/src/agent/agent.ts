@@ -1,4 +1,4 @@
-import { spawn, execSync } from 'node:child_process';
+import { spawn, execSync, exec } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -9,18 +9,15 @@ interface AgentOptions {
 
 export async function startAgent(options: AgentOptions): Promise<void> {
   const { instructions, directory } = options;
-  const absDir: string = path.resolve(process.cwd(), directory);
 
-  console.log(`▶ Running in directory: ${absDir}`);
+  console.log(`▶ Running in directory: ${directory}`);
   console.log(`▶ Instructions: ${instructions}`);
 
   const claudePath = execSync('which claude').toString().trim();
-  const claudeProc = spawn(
-    claudePath,
-    ['-p', instructions, '--output-format', 'json', '--dangerously-skip-permissions'],
+  const claudeProc = exec(
+    `${claudePath} -p "${instructions}" --output-format stream-json --dangerously-skip-permissions`,
     {
-      cwd: absDir,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: directory,
       env: process.env,
     }
   );
