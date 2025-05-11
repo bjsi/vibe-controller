@@ -381,11 +381,19 @@ const ExperimentDashboard = ({ config, onSelectBest, onRunExperiment }: Experime
           <CardTitle>Multi-Sim Visualisation</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid-background h-[500px] rounded-lg flex items-center justify-center relative drone-simulation-wrapper">
+          <div className="grid-background h-[500px] rounded-lg flex items-center justify-center relative drone-simulation-wrapper overflow-hidden">
             <iframe 
               src="http://172.237.101.153:8080" 
               className="w-full h-full border-0"
               title="Drone Simulation"
+              style={{
+                position: 'absolute',
+                width: 'calc(100% / 0.8)', // 1 / (1 - 0.2 for right crop)
+                height: 'calc(100% / 0.72)', // 1 / (1 - 0.20 for top crop)
+                top: 'calc(-28% / 0.72)', // -(cropTopPercent / (1 - cropTopPercent))
+                left: '0%', // No left crop
+                clipPath: 'inset(28% 20% 10% 0)'
+              }}
             />
           </div>
         </CardContent>
