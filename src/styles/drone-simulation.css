@@ -1,0 +1,10 @@
+.drone-simulation-wrapper iframe {
+  /* Ensure the iframe takes full space */
+  width: 100%;
+  height: 100%;
+}
+
+/* Target the banner in the iframe */
+.drone-simulation-wrapper iframe body > div:first-child {
+  display: none !important;
+} 

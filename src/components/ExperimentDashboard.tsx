@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import '@/styles/drone-simulation.css';
 
 interface Controller {
   id: string;
@@ -169,6 +170,18 @@ const ExperimentDashboard = ({ config, onSelectBest, onRunExperiment }: Experime
 
   // Handle experiment selection
   const handleSelectExperiment = (experiment: Experiment) => {
+    if (simulationRunning) {
+      setCliMessages(prev => [
+        ...prev,
+        {
+          type: 'assistant' as const,
+          content: 'Cannot change experiment while a simulation is running.',
+          timestamp: new Date().toISOString(),
+          status: 'warning' as const
+        }
+      ].slice(-20));
+      return;
+    }
     setSelectedExperiment(experiment);
     setActiveTab('log');
     
@@ -221,6 +234,16 @@ const ExperimentDashboard = ({ config, onSelectBest, onRunExperiment }: Experime
 
     try {
       setSimulationRunning(true);
+      setCliMessages(prev => [
+        ...prev,
+        {
+          type: 'assistant' as const,
+          content: `Executing drone for experiment ${selectedExperiment.id}...`,
+          timestamp: new Date().toISOString(),
+          status: 'info' as const
+        }
+      ].slice(-20));
+
       const response = await fetch('http://localhost:3000/api/execute_drone', {
         method: 'POST',
         headers: {
@@ -247,6 +270,7 @@ const ExperimentDashboard = ({ config, onSelectBest, onRunExperiment }: Experime
           }
         ].slice(-20));
       } else {
+        setSimulationRunning(false); // Stop simulation if backend fails to start
         throw new Error(data.message || 'Failed to execute drone');
       }
     } catch (error) {
@@ -256,6 +280,75 @@ const ExperimentDashboard = ({ config, onSelectBest, onRunExperiment }: Experime
         {
           type: 'assistant' as const,
           content: `Error executing drone: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          timestamp: new Date().toISOString(),
+          status: 'error' as const
+        }
+      ].slice(-20));
+    } finally {
+      // setSimulationRunning(false); // Keep it running, only backend or cancel stops it.
+    }
+  };
+
+  const cancelDroneExecution = async () => {
+    if (!selectedExperiment?.id || !simulationRunning) {
+      setCliMessages(prev => [
+        ...prev,
+        {
+          type: 'assistant' as const,
+          content: 'No simulation running to cancel.',
+          timestamp: new Date().toISOString(),
+          status: 'warning' as const
+        }
+      ].slice(-20));
+      return;
+    }
+
+    setCliMessages(prev => [
+      ...prev,
+      {
+        type: 'assistant' as const,
+        content: `Cancelling drone execution for experiment ${selectedExperiment.id}...`,
+        timestamp: new Date().toISOString(),
+        status: 'info' as const
+      }
+    ].slice(-20));
+
+    try {
+      const response = await fetch('http://localhost:3000/api/cancel_drone_execution', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: selectedExperiment.id
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to cancel drone execution');
+      }
+
+      const data = await response.json();
+      if (data.status === 'success') {
+        setCliMessages(prev => [
+          ...prev,
+          {
+            type: 'assistant' as const,
+            content: 'Drone execution cancelled successfully.',
+            timestamp: new Date().toISOString(),
+            status: 'success' as const
+          }
+        ].slice(-20));
+      } else {
+        throw new Error(data.message || 'Failed to cancel drone execution');
+      }
+    } catch (error) {
+      console.error('Error cancelling drone execution:', error);
+      setCliMessages(prev => [
+        ...prev,
+        {
+          type: 'assistant' as const,
+          content: `Error cancelling drone: ${error instanceof Error ? error.message : 'Unknown error'}`,
           timestamp: new Date().toISOString(),
           status: 'error' as const
         }
@@ -285,10 +378,10 @@ const ExperimentDashboard = ({ config, onSelectBest, onRunExperiment }: Experime
       {/* Left: Visualization */}
       <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle>Multi-Sim Visualization</CardTitle>
+          <CardTitle>Multi-Sim Visualisation</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid-background h-[500px] rounded-lg flex items-center justify-center relative">
+          <div className="grid-background h-[500px] rounded-lg flex items-center justify-center relative drone-simulation-wrapper">
             <iframe 
               src="http://172.237.101.153:8080" 
               className="w-full h-full border-0"
@@ -397,6 +490,15 @@ const ExperimentDashboard = ({ config, onSelectBest, onRunExperiment }: Experime
             >
               Execute Drone
             </Button>
+            {simulationRunning && (
+              <Button
+                onClick={cancelDroneExecution}
+                variant="destructive"
+                disabled={!simulationRunning}
+              >
+                Cancel Execution
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

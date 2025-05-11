@@ -48,8 +48,8 @@ If using PID controllers, follow these specific requirements:
 1. PID Controller Structure:
    - Use separate PID controllers for roll, pitch, and throttle
    - Initialize with appropriate gains:
-     * Roll/Pitch: kp=4.0, ki=0.2, kd=1.0
-     * Throttle: kp=3.0, ki=0.2, kd=0.5
+     * Roll/Pitch: kp=15.0, ki=0.15, kd=1.2
+     * Throttle: kp=4.5, ki=0.17, kd=0.8
    - Include anti-windup protection by clamping integral term to [-100, 100]
    - Use proper float type conversion for all PID parameters
 
