@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import '@/styles/drone-simulation.css';
 
@@ -62,6 +61,8 @@ const ExperimentDashboard = ({ config, onSelectBest, onRunExperiment }: Experime
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [selectedExperiment, setSelectedExperiment] = useState<Experiment | null>(null);
   const [activeTab, setActiveTab] = useState<'log' | 'experiments'>('experiments');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const vizWrapperRef = useRef<HTMLDivElement>(null);
 
   console.log("config", config);
   useEffect(() => {
@@ -358,6 +359,29 @@ const ExperimentDashboard = ({ config, onSelectBest, onRunExperiment }: Experime
     }
   };
 
+  const toggleFullscreen = () => {
+    const elem = vizWrapperRef.current;
+    if (!elem) return;
+
+    if (!document.fullscreenElement) {
+      elem.requestFullscreen().catch(err => {
+        alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full max-w-6xl mx-auto animate-fade-in">
@@ -376,23 +400,37 @@ const ExperimentDashboard = ({ config, onSelectBest, onRunExperiment }: Experime
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full max-w-6xl mx-auto animate-fade-in">
       {/* Left: Visualization */}
-      <Card className="lg:col-span-2">
-        <CardHeader>
+      <Card className={`lg:col-span-2 ${isFullscreen ? 'fixed inset-0 z-50 w-screen h-screen' : ''}`}>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Multi-Sim Visualisation</CardTitle>
+          <Button onClick={toggleFullscreen} variant="outline" size="sm">
+            {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+          </Button>
         </CardHeader>
-        <CardContent>
-          <div className="grid-background h-[500px] rounded-lg flex items-center justify-center relative drone-simulation-wrapper overflow-hidden">
-            <iframe 
-              src="http://172.237.101.153:8080" 
+        <CardContent className={isFullscreen ? 'h-full' : ''}>
+          <div 
+            ref={vizWrapperRef}
+            className={`grid-background rounded-lg flex items-center justify-center relative drone-simulation-wrapper overflow-hidden ${isFullscreen ? 'h-full w-full' : 'h-[500px]'}`}
+          >
+            <iframe
+              src="http://172.237.101.153:8080"
               className="w-full h-full border-0"
               title="Drone Simulation"
-              style={{
+              style={isFullscreen ? {
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                top: '0',
+                left: '0',
+                clipPath: 'none',
+              } : {
                 position: 'absolute',
                 width: 'calc(100% / 0.8)', // 1 / (1 - 0.2 for right crop)
                 height: 'calc(100% / 0.72)', // 1 / (1 - 0.20 for top crop)
                 top: 'calc(-28% / 0.72)', // -(cropTopPercent / (1 - cropTopPercent))
                 left: '0%', // No left crop
-                clipPath: 'inset(28% 20% 10% 0)'
+                clipPath: 'inset(28% 20% 10% 0)',
+                transformOrigin: 'top left',
               }}
             />
           </div>
@@ -400,116 +438,118 @@ const ExperimentDashboard = ({ config, onSelectBest, onRunExperiment }: Experime
       </Card>
       
       {/* Right: CLI Interface and Experiments */}
-      <Card className="flex flex-col">
-        <CardHeader>
-          <CardTitle>Experiment Log</CardTitle>
-        </CardHeader>
-        <CardContent className="flex-grow flex flex-col">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'log' | 'experiments')} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="log">Log</TabsTrigger>
-              <TabsTrigger value="experiments">Experiments</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="log" className="mt-4">
-              <div className="bg-black text-green-400 font-mono text-sm p-4 rounded-md h-[500px] overflow-y-auto flex flex-col">
-                {cliMessages.map((message, index) => (
-                  <div key={index} className="mb-2">
-                    <div className="flex items-start gap-2">
-                      <span className="text-gray-400">
-                        {new Date(message.timestamp).toLocaleTimeString()}
-                      </span>
-                      <span className={`${
+      {!isFullscreen && (
+        <Card className="flex flex-col">
+          <CardHeader>
+            <CardTitle>Experiment Log</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-grow flex flex-col">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'log' | 'experiments')} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="log">Log</TabsTrigger>
+                <TabsTrigger value="experiments">Experiments</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="log" className="mt-4">
+                <div className="bg-black text-green-400 font-mono text-sm p-4 rounded-md h-[500px] overflow-y-auto flex flex-col">
+                  {cliMessages.map((message, index) => (
+                    <div key={index} className="mb-2">
+                      <div className="flex items-start gap-2">
+                        <span className="text-gray-400">
+                          {new Date(message.timestamp).toLocaleTimeString()}
+                        </span>
+                        <span className={`${
+                          message.status === 'error' ? 'text-red-400' :
+                          message.status === 'warning' ? 'text-yellow-400' :
+                          message.status === 'success' ? 'text-green-400' :
+                          'text-blue-400'
+                        }`}>
+                          {message.type === 'assistant' ? 'Claude:' : 'User:'}
+                        </span>
+                      </div>
+                      <div className={`ml-8 whitespace-pre-wrap ${
                         message.status === 'error' ? 'text-red-400' :
                         message.status === 'warning' ? 'text-yellow-400' :
                         message.status === 'success' ? 'text-green-400' :
-                        'text-blue-400'
+                        'text-gray-300'
                       }`}>
-                        {message.type === 'assistant' ? 'Claude:' : 'User:'}
-                      </span>
-                    </div>
-                    <div className={`ml-8 whitespace-pre-wrap ${
-                      message.status === 'error' ? 'text-red-400' :
-                      message.status === 'warning' ? 'text-yellow-400' :
-                      message.status === 'success' ? 'text-green-400' :
-                      'text-gray-300'
-                    }`}>
-                      {message.content}
-                    </div>
-                  </div>
-                ))}
-                {simulationRunning && (
-                  <div className="animate-pulse text-green-400">_</div>
-                )}
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="experiments" className="mt-4">
-              <div className="space-y-4 max-h-[500px] overflow-y-auto">
-                {experiments.length === 0 ? (
-                  <div className="text-center text-muted-foreground py-8">
-                    No experiments found
-                  </div>
-                ) : (
-                  experiments.map(experiment => (
-                    <Card key={experiment.id} className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-medium">Experiment {experiment.id}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {new Date(experiment.startTime).toLocaleString()}
-                          </p>
-                          <p className="text-sm mt-2 line-clamp-2">
-                            {experiment.instructions}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            experiment.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            experiment.status === 'error' ? 'bg-red-100 text-red-800' :
-                            experiment.status === 'running' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {experiment.status}
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSelectExperiment(experiment)}
-                            disabled={experiment.status === 'running'}
-                          >
-                            Select
-                          </Button>
-                        </div>
+                        {message.content}
                       </div>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-          
-          <div className="mt-4 flex justify-between">
-            <Button 
-              onClick={executeDrone}
-              variant="outline"
-              className="mr-2"
-              disabled={!selectedExperiment || simulationRunning}
-            >
-              Execute Drone
-            </Button>
-            {simulationRunning && (
-              <Button
-                onClick={cancelDroneExecution}
-                variant="destructive"
-                disabled={!simulationRunning}
+                    </div>
+                  ))}
+                  {simulationRunning && (
+                    <div className="animate-pulse text-green-400">_</div>
+                  )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="experiments" className="mt-4">
+                <div className="space-y-4 max-h-[500px] overflow-y-auto">
+                  {experiments.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-8">
+                      No experiments found
+                    </div>
+                  ) : (
+                    experiments.map(experiment => (
+                      <Card key={experiment.id} className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-medium">Experiment {experiment.id}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(experiment.startTime).toLocaleString()}
+                            </p>
+                            <p className="text-sm mt-2 line-clamp-2">
+                              {experiment.instructions}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              experiment.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              experiment.status === 'error' ? 'bg-red-100 text-red-800' :
+                              experiment.status === 'running' ? 'bg-blue-100 text-blue-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {experiment.status}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSelectExperiment(experiment)}
+                              disabled={experiment.status === 'running'}
+                            >
+                              Select
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+            
+            <div className="mt-4 flex justify-between">
+              <Button 
+                onClick={executeDrone}
+                variant="outline"
+                className="mr-2"
+                disabled={!selectedExperiment || simulationRunning}
               >
-                Cancel Execution
+                Execute Drone
               </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              {simulationRunning && (
+                <Button
+                  onClick={cancelDroneExecution}
+                  variant="destructive"
+                  disabled={!simulationRunning}
+                >
+                  Cancel Execution
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
